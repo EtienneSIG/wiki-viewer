@@ -53,6 +53,8 @@ export interface GraphNode {
   label: string;
   group: string;
   degree: number;
+  /** Client slugs this page is associated with (for the graph client filter). */
+  clients: string[];
 }
 
 export interface GraphLink {
@@ -271,11 +273,37 @@ export function buildModel(rootName: string, files: WikiFile[]): WikiModel {
       degree.set(target, (degree.get(target) ?? 0) + 1);
     }
   }
+  // Client association per page, so the graph can filter "par client".
+  // A client is a page under the `clients` category; its slug is the client id
+  // (e.g. alstom, michelin). A page belongs to a client when it IS that client
+  // page, when one of its tags matches a client slug, or when its filename is
+  // prefixed with `<client>-` (the project naming convention).
+  const clientSlugs = new Set<string>();
+  for (const f of files) {
+    if (f.category.toLowerCase() === 'clients' && f.slug !== '_index') {
+      clientSlugs.add(f.slug.toLowerCase());
+    }
+  }
+  const clientsOf = (f: WikiFile): string[] => {
+    const found = new Set<string>();
+    const slug = f.slug.toLowerCase();
+    if (clientSlugs.has(slug)) found.add(slug);
+    for (const tag of f.tags) {
+      const t = tag.toLowerCase();
+      if (clientSlugs.has(t)) found.add(t);
+    }
+    for (const client of clientSlugs) {
+      if (slug.startsWith(`${client}-`)) found.add(client);
+    }
+    return [...found];
+  };
+
   const nodes: GraphNode[] = files.map((f) => ({
     id: f.path,
     label: f.title,
     group: f.group,
     degree: degree.get(f.path) ?? 0,
+    clients: clientsOf(f),
   }));
 
   const resolve = (target: string): WikiResolveResult => {

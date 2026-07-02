@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   forceSimulation,
   forceLink,
@@ -24,6 +24,7 @@ interface GNode extends SimulationNodeDatum {
   label: string;
   group: string;
   degree: number;
+  clients: string[];
 }
 type GLink = SimulationLinkDatum<GNode>;
 
@@ -104,7 +105,15 @@ export function GraphView({ graph, activePath, onOpen, theme }: GraphViewProps):
   const [search, setSearch] = useState('');
   const [showOrphans, setShowOrphans] = useState(true);
   const [showLabels, setShowLabels] = useState(false);
+  const [clientFilter, setClientFilter] = useState('');
   const [legend, setLegend] = useState<{ group: string; color: string }[]>([]);
+
+  // All client slugs present in the graph, for the "filtre par client" dropdown.
+  const clientOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const n of graph.nodes) for (const c of n.clients) set.add(c);
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [graph]);
 
   // Keep style refs in sync and repaint when purely visual state changes.
   useEffect(() => {
@@ -146,7 +155,22 @@ export function GraphView({ graph, activePath, onOpen, theme }: GraphViewProps):
 
     const nodes: GNode[] = graph.nodes
       .filter((n) => showOrphans || n.degree > 0)
-      .map((n) => ({ id: n.id, label: n.label, group: n.group, degree: n.degree }));
+      .map((n) => ({ id: n.id, label: n.label, group: n.group, degree: n.degree, clients: n.clients }));
+
+    // "Filtre par client": keep the client's pages plus their direct neighbors
+    // (so the surrounding context stays visible), then drop everything else.
+    if (clientFilter) {
+      const direct = new Set(nodes.filter((n) => n.clients.includes(clientFilter)).map((n) => n.id));
+      const keep = new Set(direct);
+      for (const l of graph.links) {
+        if (direct.has(l.source)) keep.add(l.target);
+        if (direct.has(l.target)) keep.add(l.source);
+      }
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        if (!keep.has(nodes[i].id)) nodes.splice(i, 1);
+      }
+    }
+
     const present = new Set(nodes.map((n) => n.id));
     const links: GLink[] = graph.links
       .filter((l) => present.has(l.source) && present.has(l.target))
@@ -191,7 +215,7 @@ export function GraphView({ graph, activePath, onOpen, theme }: GraphViewProps):
     return () => {
       sim.stop();
     };
-  }, [graph, showOrphans, focusActive]);
+  }, [graph, showOrphans, clientFilter, focusActive]);
 
   // Canvas sizing (device-pixel-ratio aware) + resize handling.
   useEffect(() => {
@@ -341,9 +365,11 @@ export function GraphView({ graph, activePath, onOpen, theme }: GraphViewProps):
       if (hit) {
         mode = 'node';
         dragNode = hit;
+        canvas.style.cursor = 'grabbing';
         simRef.current?.alphaTarget(0.3).restart();
       } else {
         mode = 'pan';
+        canvas.style.cursor = 'grabbing';
         origin = { x: transformRef.current.x, y: transformRef.current.y };
       }
     };
@@ -410,15 +436,26 @@ export function GraphView({ graph, activePath, onOpen, theme }: GraphViewProps):
       drawRef.current();
     };
 
+    const onPointerLeave = (): void => {
+      if (mode !== 'none') return;
+      if (hoverRef.current !== null) {
+        hoverRef.current = null;
+        drawRef.current();
+      }
+      canvas.style.cursor = 'grab';
+    };
+
     canvas.style.cursor = 'grab';
     canvas.addEventListener('pointerdown', onPointerDown);
     canvas.addEventListener('pointermove', onPointerMove);
     canvas.addEventListener('pointerup', onPointerUp);
+    canvas.addEventListener('pointerleave', onPointerLeave);
     canvas.addEventListener('wheel', onWheel, { passive: false });
     return () => {
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerup', onPointerUp);
+      canvas.removeEventListener('pointerleave', onPointerLeave);
       canvas.removeEventListener('wheel', onWheel);
     };
   }, [onOpen]);
@@ -428,6 +465,36 @@ export function GraphView({ graph, activePath, onOpen, theme }: GraphViewProps):
     simRef.current?.alpha(0.6).restart();
     drawRef.current();
   }, []);
+
+  // Re-scatter every node and re-run the layout hot, so a tangled graph
+  // untangles into a fresh, readable arrangement.
+  const reorganize = useCallback(() => {
+    const sim = simRef.current;
+    const nodes = nodesRef.current;
+    if (!sim || nodes.length === 0) return;
+    const { w, h } = dimsRef.current;
+    const cx = w / 2;
+    const cy = h / 2;
+    const radius = Math.max(120, Math.min(w, h) * 0.42);
+    nodes.forEach((n, i) => {
+      // Golden-angle spiral gives an even, non-overlapping initial spread.
+      const a = i * 2.399963229728653;
+      const rr = radius * Math.sqrt((i + 1) / nodes.length);
+      n.x = cx + rr * Math.cos(a);
+      n.y = cy + rr * Math.sin(a);
+      n.vx = 0;
+      n.vy = 0;
+      n.fx = null;
+      n.fy = null;
+    });
+    transformRef.current = { x: 0, y: 0, k: 1 };
+    sim.alpha(1).alphaTarget(0).restart();
+    window.setTimeout(() => {
+      focusActive();
+      drawRef.current();
+    }, 600);
+    drawRef.current();
+  }, [focusActive]);
 
   return (
     <div className="wv-graph" ref={wrapRef}>
@@ -457,9 +524,30 @@ export function GraphView({ graph, activePath, onOpen, theme }: GraphViewProps):
           />
           Étiquettes
         </label>
-        <button type="button" className="wv-graph-reset" onClick={resetView}>
-          Réinitialiser la vue
-        </button>
+        {clientOptions.length > 0 && (
+          <select
+            className="wv-graph-select"
+            value={clientFilter}
+            onChange={(e) => setClientFilter(e.target.value)}
+            aria-label="Filtrer par client"
+            title="Filtrer par client"
+          >
+            <option value="">Tous les clients</option>
+            {clientOptions.map((c) => (
+              <option key={c} value={c}>
+                {c.charAt(0).toUpperCase() + c.slice(1)}
+              </option>
+            ))}
+          </select>
+        )}
+        <div className="wv-graph-buttons">
+          <button type="button" className="wv-graph-reset" onClick={reorganize}>
+            Réorganiser
+          </button>
+          <button type="button" className="wv-graph-reset" onClick={resetView}>
+            Réinitialiser la vue
+          </button>
+        </div>
         {legend.length > 0 && (
           <div className="wv-graph-legend">
             {legend.map((l) => (
