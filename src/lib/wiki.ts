@@ -8,6 +8,25 @@ import type { WikiResolveResult } from '../markdown/remark-wikilink';
 
 const MD_EXT = /\.(md|markdown|mdown|mkd)$/i;
 
+/**
+ * Directories that never contain wiki content but can hold hundreds of
+ * Markdown files (dependencies, build output). Scanning them — especially on
+ * cloud-synced folders — is what made "open a wiki" hang. Dot-prefixed dirs
+ * (.git, .obsidian, …) are skipped separately.
+ */
+const IGNORED_DIRS = new Set([
+  'node_modules',
+  'dist',
+  'build',
+  'out',
+  'coverage',
+  'vendor',
+  'target',
+  '.next',
+  '.turbo',
+  '.cache',
+]);
+
 export interface WikiFile {
   /** Path relative to the opened root, forward slashes (e.g. `wiki/domains/foo.md`). */
   path: string;
@@ -80,6 +99,7 @@ async function collectFiles(
 ): Promise<void> {
   for await (const entry of dir.values()) {
     if (entry.name.startsWith('.')) continue; // skip .obsidian, .git, …
+    if (entry.kind === 'directory' && IGNORED_DIRS.has(entry.name.toLowerCase())) continue;
     const path = base ? `${base}/${entry.name}` : entry.name;
     if (entry.kind === 'directory') {
       await collectFiles(entry as FileSystemDirectoryHandle, path, acc);
