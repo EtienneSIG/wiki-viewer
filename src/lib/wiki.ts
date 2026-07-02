@@ -61,6 +61,8 @@ export interface GraphNode {
   degree: number;
   /** Client slugs this page is associated with (for the graph client filter). */
   clients: string[];
+  /** Optional secondary line (e.g. a contact's job title) shown on hover/focus. */
+  title?: string;
 }
 
 export interface GraphLink {

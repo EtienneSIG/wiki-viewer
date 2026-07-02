@@ -17,6 +17,8 @@ export interface GraphViewProps {
   activePath: string | null;
   onOpen: (path: string) => void;
   theme: ThemeId;
+  /** Placeholder for the search box (defaults to "Rechercher une page…"). */
+  searchPlaceholder?: string;
 }
 
 interface GNode extends SimulationNodeDatum {
@@ -25,6 +27,7 @@ interface GNode extends SimulationNodeDatum {
   group: string;
   degree: number;
   clients: string[];
+  title?: string;
 }
 type GLink = SimulationLinkDatum<GNode>;
 
@@ -97,7 +100,7 @@ function themeColors(theme: ThemeId): Palettes {
  * Pan (drag background), zoom (wheel), drag nodes, hover to highlight neighbors,
  * click a node to open the page. Search dims non-matches; orphans can be hidden.
  */
-export function GraphView({ graph, activePath, onOpen, theme }: GraphViewProps): JSX.Element {
+export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder }: GraphViewProps): JSX.Element {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -185,7 +188,7 @@ export function GraphView({ graph, activePath, onOpen, theme }: GraphViewProps):
     const nodes: GNode[] = graph.nodes
       .filter((n) => !isHiddenFromGraph(n.id))
       .filter((n) => showOrphans || n.degree > 0)
-      .map((n) => ({ id: n.id, label: n.label, group: n.group, degree: n.degree, clients: n.clients }));
+      .map((n) => ({ id: n.id, label: n.label, group: n.group, degree: n.degree, clients: n.clients, title: n.title }));
 
     // "Filtre par client": keep the client's pages plus their direct neighbors
     // (so the surrounding context stays visible), then drop everything else.
@@ -351,6 +354,14 @@ export function GraphView({ graph, activePath, onOpen, theme }: GraphViewProps):
           ctx.textBaseline = 'top';
           const label = n.label.length > 34 ? `${n.label.slice(0, 33)}…` : n.label;
           ctx.fillText(label, n.x, n.y + r + 2 / k);
+          // Secondary line (e.g. a contact's job title), only when focused.
+          if (n.title && (n.id === focusId || k > 2)) {
+            ctx.font = `${9 / k}px "Segoe UI", sans-serif`;
+            ctx.fillStyle = c.fg;
+            ctx.globalAlpha = dim ? 0.14 : 0.7;
+            const sub = n.title.length > 40 ? `${n.title.slice(0, 39)}…` : n.title;
+            ctx.fillText(sub, n.x, n.y + r + 2 / k + 13 / k);
+          }
         }
         ctx.globalAlpha = 1;
       }
@@ -535,7 +546,7 @@ export function GraphView({ graph, activePath, onOpen, theme }: GraphViewProps):
         <input
           type="search"
           className="wv-graph-search"
-          placeholder="Rechercher une page…"
+          placeholder={searchPlaceholder ?? 'Rechercher une page…'}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />

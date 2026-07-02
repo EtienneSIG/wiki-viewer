@@ -6,13 +6,14 @@ import { FileTree } from '../components/sidebar/FileTree';
 import { Backlinks } from '../components/backlinks/Backlinks';
 import { GraphView } from '../components/graph/GraphView';
 import { scanEntries, buildLightModel, readEntries, buildModel, type WikiModel } from '../lib/wiki';
+import { buildContactsGraph } from '../lib/contacts';
 import { splitFrontmatter, joinFrontmatter } from '../lib/frontmatter';
 import { writeFileHandle, loadFolders, saveFolders, readFileAtPath } from '../lib/folder-handle';
 import { applyTheme } from './theme';
 import { t } from '../lib/i18n';
 import type { ThemeId } from '../lib/types';
 
-type ViewMode = 'read' | 'edit' | 'graph';
+type ViewMode = 'read' | 'edit' | 'graph' | 'contacts';
 
 const THEMES: ThemeId[] = ['system', 'light', 'dark', 'high-contrast'];
 
@@ -51,6 +52,11 @@ export function App(): JSX.Element {
   const resolvedTheme = useMemo(() => resolveTheme(theme), [theme]);
   const activeFile = model && activePath ? model.byPath.get(activePath) ?? null : null;
   const isExcalidraw = activeFile?.kind === 'excalidraw';
+
+  // Second graph: customer contacts only, derived from the contacts directory
+  // page. Rebuilt whenever the model changes (i.e. after background indexing
+  // populates page contents).
+  const contacts = useMemo(() => (model ? buildContactsGraph(model) : null), [model]);
 
   // Resolve a root-relative asset path (e.g. an image referenced from Markdown)
   // to an object URL, reading it from the opened folder. Stays offline-first.
@@ -182,9 +188,19 @@ export function App(): JSX.Element {
       void openFile(model, path);
       // Excalidraw diagrams have no editable source view; always show them in read.
       const target = model.byPath.get(path);
-      if (view === 'graph' || target?.kind === 'excalidraw') setView('read');
+      if (view === 'graph' || view === 'contacts' || target?.kind === 'excalidraw') setView('read');
     },
     [model, dirty, view, openFile],
+  );
+
+  // Clicking a contacts-graph node opens its mapped wiki page (the directory,
+  // or the client hub for account nodes) rather than the synthetic node id.
+  const openContactNode = useCallback(
+    (nodeId: string): void => {
+      const target = contacts?.openTargets.get(nodeId);
+      if (target) openPath(target);
+    },
+    [contacts, openPath],
   );
 
   const handleSave = useCallback(async (): Promise<void> => {
@@ -278,6 +294,9 @@ export function App(): JSX.Element {
               <button type="button" onClick={() => setView('graph')} aria-pressed={view === 'graph'}>
                 {t('view.graph')}
               </button>
+              <button type="button" onClick={() => setView('contacts')} aria-pressed={view === 'contacts'}>
+                {t('view.contacts')}
+              </button>
             </div>
           </div>
         )}
@@ -349,7 +368,7 @@ export function App(): JSX.Element {
           </aside>
         )}
 
-        <main className={`markdit-main${model && view === 'graph' ? ' wv-main-graph' : ''}`}>
+        <main className={`markdit-main${model && (view === 'graph' || view === 'contacts') ? ' wv-main-graph' : ''}`}>
           {!model ? (
             <EmptyState onOpen={openWiki} reopenDir={reopenDir} onReopen={reopen} loading={loading} error={error} />
           ) : view === 'graph' ? (
@@ -361,6 +380,24 @@ export function App(): JSX.Element {
               </div>
             ) : (
               <GraphView graph={model.graph} activePath={activePath} onOpen={openPath} theme={resolvedTheme} />
+            )
+          ) : view === 'contacts' ? (
+            contacts && contacts.contactCount > 0 ? (
+              <GraphView
+                graph={contacts.graph}
+                activePath={activePath}
+                onOpen={openContactNode}
+                theme={resolvedTheme}
+                searchPlaceholder={t('contacts.search')}
+              />
+            ) : (
+              <div className="wv-empty">
+                <div className="wv-empty-card">
+                  <p className="wv-empty-text">
+                    {indexing ? 'Indexation des contacts en cours…' : t('contacts.empty')}
+                  </p>
+                </div>
+              </div>
             )
           ) : (
             <div className="wv-doc">
