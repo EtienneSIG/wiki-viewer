@@ -376,12 +376,27 @@ function resolveRelativePath(fromPath: string, rel: string): string {
   return stack.join('/');
 }
 
+/**
+ * Meta/hub pages hidden from the sidebar tree (they link to everything and add
+ * noise). They stay indexed and remain valid [[wikilink]] targets.
+ */
+const HIDDEN_SLUGS = new Set(['karpathy-llm-wiki']);
+
+/** True for pages whose slug is in HIDDEN_SLUGS. */
+function isHiddenSlug(path: string): boolean {
+  const base = (path.split('/').pop() ?? path).toLowerCase();
+  const slug = base.replace(/\.(md|markdown|mdown|mkd)$/i, '');
+  return HIDDEN_SLUGS.has(slug);
+}
+
 function buildTree(files: WikiFile[]): TreeNode[] {
   const root: TreeNode = { name: '', path: '', kind: 'dir', children: [] };
   for (const f of files) {
     const parts = f.path.split('/');
     // Hide underscore-prefixed files and folders (e.g. _index.md, _queries/).
     if (parts.some((p) => p.startsWith('_'))) continue;
+    // Hide specific meta/hub pages from the tree (e.g. the Karpathy wiki-pattern page).
+    if (isHiddenSlug(f.path)) continue;
     let cur = root;
     for (let i = 0; i < parts.length; i++) {
       const name = parts[i];
