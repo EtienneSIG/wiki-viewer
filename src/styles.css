@@ -246,6 +246,16 @@ body {
   border-color: var(--accent-hover);
 }
 
+.markdit-actions button.is-active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.markdit-actions button.is-active:hover {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
 .markdit-icon {
   width: 16px;
   height: 16px;

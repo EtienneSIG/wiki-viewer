@@ -15,6 +15,11 @@ import type { ThemeId } from '../lib/types';
 
 type ViewMode = 'read' | 'edit' | 'graph' | 'contacts';
 
+/** Delay after the last keystroke before autosave writes to disk. */
+const AUTOSAVE_DELAY_MS = 1000;
+/** localStorage key remembering the autosave preference across sessions. */
+const AUTOSAVE_KEY = 'wv-autosave';
+
 const THEMES: ThemeId[] = ['system', 'light', 'dark', 'high-contrast'];
 
 function resolveTheme(theme: ThemeId): ThemeId {
@@ -48,6 +53,13 @@ export function App(): JSX.Element {
   const [indexing, setIndexing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  const [autosave, setAutosave] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(AUTOSAVE_KEY) !== '0';
+    } catch {
+      return true;
+    }
+  });
 
   const resolvedTheme = useMemo(() => resolveTheme(theme), [theme]);
   const activeFile = model && activePath ? model.byPath.get(activePath) ?? null : null;
@@ -237,6 +249,30 @@ export function App(): JSX.Element {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [handleSave]);
 
+  // Persist the autosave preference across sessions.
+  useEffect(() => {
+    try {
+      localStorage.setItem(AUTOSAVE_KEY, autosave ? '1' : '0');
+    } catch {
+      /* ignore quota/private-mode errors */
+    }
+  }, [autosave]);
+
+  // Autosave: while editing, persist to disk shortly after the user stops
+  // typing. Reuses handleSave (which leaves `body` untouched, so the editor
+  // never re-syncs and the caret is preserved). Gated on `dirty` so opening a
+  // file — which resets dirty=false — never triggers a spurious write.
+  useEffect(() => {
+    if (!autosave) return;
+    if (view !== 'edit') return;
+    if (!dirty) return;
+    if (!activeFile || isExcalidraw) return;
+    const id = window.setTimeout(() => {
+      void handleSave();
+    }, AUTOSAVE_DELAY_MS);
+    return () => window.clearTimeout(id);
+  }, [autosave, view, dirty, body, frontmatterRaw, activeFile, isExcalidraw, handleSave]);
+
   const cycleTheme = useCallback(() => {
     setTheme((cur) => THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length]);
   }, []);
@@ -308,6 +344,21 @@ export function App(): JSX.Element {
               <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4" />
             </svg>
           </button>
+          {model && (
+            <button
+              type="button"
+              className={autosave ? 'is-active' : undefined}
+              onClick={() => setAutosave((v) => !v)}
+              aria-pressed={autosave}
+              title={autosave ? t('action.autosaveOn') : t('action.autosaveOff')}
+            >
+              <svg className="markdit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 12a9 9 0 1 1-3-6.7" />
+                <path d="M21 4v5h-5" />
+              </svg>
+              {t('action.autosave')}
+            </button>
+          )}
           {model && (
             <button type="button" onClick={handleSave} disabled={!activeFile || isExcalidraw || saveStatus === 'saving'} title={t('action.save')}>
               <svg className="markdit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
