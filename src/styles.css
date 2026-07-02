@@ -1,0 +1,909 @@
+:root {
+  color-scheme: light dark;
+  /* Surfaces & text (Loop / Fluent neutral palette) */
+  --bg: #ffffff;
+  --fg: #242424;
+  --muted: #616161;
+  --border: #e6e4e1;
+  --code-bg: #f5f4f2;
+  --surface: #faf9f8;
+  --surface-2: #f0eeec;
+  --surface-hover: #eceae8;
+  /* Brand accent (Loop / Teams purple) */
+  --accent: #5b5fc7;
+  --accent-hover: #4f52b2;
+  --accent-text: #3b3d8f;
+  --accent-soft: #ecedfb;
+  /* Shape & depth */
+  --radius: 8px;
+  --radius-lg: 14px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='dark'] {
+  --bg: #1f1f1f;
+  --fg: #e8e8e8;
+  --muted: #adadad;
+  --border: #383838;
+  --code-bg: #2a2a2a;
+  --surface: #141414;
+  --surface-2: #2a2a2a;
+  --surface-hover: #333333;
+  --accent: #9ea2ff;
+  --accent-hover: #b3b6ff;
+  --accent-text: #c8caff;
+  --accent-soft: #2d2f47;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+
+[data-theme='high-contrast'] {
+  --bg: #000000;
+  --fg: #ffffff;
+  --muted: #d0d0d0;
+  --border: #ffffff;
+  --code-bg: #0a0a0a;
+  --surface: #000000;
+  --surface-2: #1a1a1a;
+  --surface-hover: #262626;
+  --accent: #ffd700;
+  --accent-hover: #ffe34d;
+  --accent-text: #ffd700;
+  --accent-soft: #1a1a1a;
+  --shadow-sm: 0 0 0 1px #ffffff;
+  --shadow-md: 0 0 0 1px #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--surface);
+  color: var(--fg);
+  font-family:
+    'Segoe UI', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+}
+
+.markdit-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--surface);
+}
+
+/* ───────────────────────── Top bar (Loop-style) ───────────────────────── */
+.markdit-topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.9rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  min-height: 48px;
+}
+
+.markdit-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.markdit-burger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.markdit-burger:hover {
+  background: var(--surface-hover);
+}
+
+.markdit-burger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.markdit-burger[aria-pressed='false'] {
+  color: var(--muted);
+}
+
+.markdit-topbar-center {
+  margin: 0 auto;
+}
+
+.markdit-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.markdit-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+}
+
+.markdit-brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.markdit-breadcrumb-sep {
+  color: var(--muted);
+  font-size: 1rem;
+  user-select: none;
+}
+
+.markdit-filename {
+  color: var(--muted);
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 22ch;
+}
+
+/* Segmented Read/Edit control */
+.markdit-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface-2);
+  border-radius: 999px;
+}
+
+.markdit-segmented button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  padding: 0.3rem 0.95rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.markdit-segmented button:hover {
+  color: var(--fg);
+}
+
+.markdit-segmented button[aria-pressed='true'] {
+  background: var(--bg);
+  color: var(--accent-text);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Top-bar action buttons */
+.markdit-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.markdit-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 0.35rem 0.7rem;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.markdit-actions button:hover {
+  background: var(--surface-hover);
+}
+
+.markdit-actions button.is-primary {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+}
+
+.markdit-actions button.is-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.markdit-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* Visible focus indicator (WCAG 2.2 AA — 2.4.11/2.4.13). */
+button:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ───────────────────────── Remote-content notice ──────────────────────── */
+.markdit-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.markdit-notice button {
+  background: transparent;
+  color: var(--accent-text);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 0.2rem 0.6rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Update-available variant: accent the banner and push the dismiss to the end. */
+.markdit-notice--update {
+  background: var(--accent-soft);
+}
+
+.markdit-notice--update > span {
+  font-weight: 500;
+}
+
+.markdit-notice--update .markdit-notice-dismiss {
+  margin-left: auto;
+  border-color: transparent;
+  color: var(--muted);
+  line-height: 1;
+  padding: 0.15rem 0.4rem;
+}
+
+.markdit-notice--update .markdit-notice-dismiss:hover {
+  background: var(--surface-hover);
+  color: var(--fg);
+}
+
+/* ───────────────────────── Body: sidebar + main ───────────────────────── */
+.markdit-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.markdit-main {
+  flex: 1;
+  overflow: auto;
+  padding: clamp(0.75rem, 3vw, 2rem);
+  background: var(--surface);
+}
+
+/* ───────────────────────── Sidebar (Loop nav) ─────────────────────────── */
+.markdit-sidebar {
+  position: relative;
+  width: 16rem;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+/* Drag handle on the right edge to widen/narrow the navigation. */
+.markdit-sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+  background: transparent;
+  transition: background 0.12s ease;
+}
+
+.markdit-sidebar-resizer:hover,
+.markdit-sidebar-resizer:focus-visible {
+  background: var(--accent-soft);
+  outline: none;
+}
+
+.markdit-sidebar-resizer:focus-visible {
+  box-shadow: inset -2px 0 0 var(--accent-text);
+}
+
+.markdit-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 0.85rem 0.5rem;
+}
+
+.markdit-sidebar-header strong {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.markdit-sidebar-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.markdit-sidebar-header .markdit-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  color: var(--muted);
+}
+
+.markdit-sidebar-header .markdit-icon-button:hover:not(:disabled) {
+  color: var(--fg);
+}
+
+.markdit-sidebar-header .markdit-icon-button:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.markdit-icon.is-spinning {
+  animation: markdit-spin 0.8s linear infinite;
+}
+
+@keyframes markdit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .markdit-icon.is-spinning {
+    animation: none;
+  }
+}
+
+.markdit-sidebar-header button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: transparent;
+  color: var(--accent-text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.2rem 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.markdit-sidebar-header button:hover {
+  background: var(--surface-hover);
+}
+
+.markdit-sidebar-root {
+  padding: 0.25rem 0.85rem 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.markdit-sidebar-reopen {
+  margin: 0.25rem 0.85rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: transparent;
+  color: var(--accent-text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s ease;
+}
+
+.markdit-sidebar-reopen:hover {
+  background: var(--surface-hover);
+}
+
+.markdit-sidebar-body {
+  flex: 1;
+  overflow: auto;
+  padding: 0.25rem 0.5rem 0.5rem;
+}
+
+.markdit-sidebar-empty {
+  padding: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.markdit-sidebar-error {
+  padding: 0.5rem 0.85rem;
+  font-size: 0.8rem;
+  color: #d13438;
+}
+
+.markdit-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.markdit-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: var(--fg);
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.3rem 0.5rem;
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background 0.1s ease;
+}
+
+/* Truncate long names with an ellipsis inside the flex row. */
+.markdit-tree-row > span {
+  flex: 0 0 auto;
+}
+
+.markdit-tree-file {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.markdit-tree-row:hover {
+  background: var(--surface-hover);
+}
+
+.markdit-tree-file.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.markdit-tree-dir {
+  font-weight: 600;
+}
+
+/* Multi-root: each opened folder / files group is a removable top-level row. */
+.markdit-tree--roots > .markdit-root {
+  margin-bottom: 0.15rem;
+}
+
+.markdit-root-row {
+  display: flex;
+  align-items: center;
+}
+
+.markdit-root-row .markdit-root-toggle {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.markdit-root-remove {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 0.25rem;
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.75rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: background 0.1s ease, opacity 0.1s ease;
+}
+
+.markdit-root-row:hover .markdit-root-remove,
+.markdit-root-remove:focus-visible {
+  opacity: 1;
+}
+
+.markdit-root-remove:hover {
+  background: var(--surface-hover);
+  color: var(--fg);
+}
+
+.markdit-root-empty {
+  padding: 0.35rem 0.5rem 0.35rem 1.5rem;
+  font-size: 0.8rem;
+}
+
+/* ───────────────────────── Document surface ───────────────────────────── */
+.markdit-reader,
+.markdit-editor {
+  /* Adapt to the available main-area width while capping line length on
+     ultra-wide displays for comfortable reading (FR-001..FR-003). */
+  width: 100%;
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 2.5rem clamp(1rem, 4vw, 3.5rem);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  line-height: 1.65;
+}
+
+.markdit-reader:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.markdit-reader h1,
+.markdit-editor h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 1rem;
+}
+
+.markdit-reader h2,
+.markdit-editor h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin: 1.6rem 0 0.8rem;
+}
+
+.markdit-reader pre,
+.markdit-editor pre {
+  background: var(--code-bg);
+  padding: 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  overflow: auto;
+}
+
+.markdit-reader code,
+.markdit-editor code {
+  background: var(--code-bg);
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.markdit-reader pre code,
+.markdit-editor pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.markdit-reader blockquote,
+.markdit-editor blockquote {
+  margin: 1rem 0;
+  padding: 0.25rem 1rem;
+  border-left: 3px solid var(--accent);
+  color: var(--muted);
+}
+
+.markdit-reader table,
+.markdit-editor table {
+  border-collapse: collapse;
+}
+
+.markdit-reader th,
+.markdit-reader td,
+.markdit-editor th,
+.markdit-editor td {
+  border: 1px solid var(--border);
+  padding: 0.3rem 0.6rem;
+}
+
+.markdit-reader th,
+.markdit-editor th {
+  background: var(--surface-2);
+}
+
+.markdit-editor:focus-within {
+  border-color: var(--accent);
+}
+
+.markdit-editor .ProseMirror:focus {
+  outline: none;
+}
+
+.markdit-reader .markdit-notice[role='status'] {
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+}
+
+/* ───────────────────────── Editor shell + ribbon ──────────────────────── */
+.markdit-editor-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Word-like ribbon: a sticky band of grouped, labelled controls. */
+.markdit-ribbon {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 0.4rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  max-width: 48rem;
+  margin: 0 auto;
+  overflow-x: auto;
+}
+
+.markdit-ribbon-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 0.7rem;
+}
+
+.markdit-ribbon-group + .markdit-ribbon-group {
+  border-left: 1px solid var(--border);
+}
+
+.markdit-ribbon-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.markdit-ribbon-label {
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+
+.markdit-ribbon button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.markdit-ribbon button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.markdit-ribbon button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.markdit-ribbon button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.markdit-ribbon .markdit-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* ───────────────────────── Modal dialogs ──────────────────────────────── */
+.markdit-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(1px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.markdit-modal {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  width: min(30rem, 92vw);
+  max-height: 85vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  box-shadow: var(--shadow-md);
+}
+
+.markdit-modal h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.markdit-modal select {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.5rem;
+  font: inherit;
+}
+
+.markdit-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.markdit-modal-actions button {
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.85rem;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.markdit-modal-actions button:hover {
+  background: var(--surface-hover);
+}
+
+.markdit-modal-actions button:last-child {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+}
+
+.markdit-modal-actions button:last-child:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.markdit-modal-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.markdit-source {
+  width: 100%;
+  min-height: 60vh;
+  font-family: 'Cascadia Code', Consolas, monospace;
+  background: var(--code-bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.markdit-modal-wide {
+  width: min(52rem, 95vw);
+}
+
+.markdit-slides-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.markdit-slides-toolbar select {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.3rem 0.5rem;
+  font: inherit;
+}
+
+.markdit-slides-preview {
+  width: 100%;
+  height: min(48vh, 28rem);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #1e1e1e;
+}
+
+.markdit-slides-source-details > summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--muted);
+  padding: 0.2rem 0;
+}
+
+.markdit-slides-output {
+  min-height: 12rem;
+  max-height: 40vh;
+  resize: vertical;
+  font-size: 0.85rem;
+  white-space: pre;
+  margin-top: 0.5rem;
+}
+
+.markdit-slides-count {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.markdit-slides-status {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--accent);
+}

@@ -1,0 +1,298 @@
+/**
+ * Wiki model: scan an opened folder of Markdown files and derive everything the
+ * UI needs — the file tree, the link graph (Obsidian-style), backlinks, and a
+ * `[[wikilink]]` resolver shared with the reader.
+ */
+import { splitFrontmatter, asList } from './frontmatter';
+import type { WikiResolveResult } from '../markdown/remark-wikilink';
+
+const MD_EXT = /\.(md|markdown|mdown|mkd)$/i;
+
+export interface WikiFile {
+  /** Path relative to the opened root, forward slashes (e.g. `wiki/domains/foo.md`). */
+  path: string;
+  /** Basename with extension (e.g. `foo.md`). */
+  name: string;
+  /** Basename without extension (e.g. `foo`). */
+  slug: string;
+  /** Display title — frontmatter `title` or the slug. */
+  title: string;
+  /** Frontmatter `category`, else the immediate parent folder. Drives graph color. */
+  category: string;
+  tags: string[];
+  /** Grouping key for the graph (same as `category`). */
+  group: string;
+  /** Full raw Markdown (including frontmatter). */
+  content: string;
+  handle: FileSystemFileHandle;
+  /** Resolved outgoing links (paths of existing pages). */
+  outLinks: string[];
+}
+
+export interface GraphNode {
+  id: string;
+  label: string;
+  group: string;
+  degree: number;
+}
+
+export interface GraphLink {
+  source: string;
+  target: string;
+}
+
+export interface WikiGraph {
+  nodes: GraphNode[];
+  links: GraphLink[];
+}
+
+export interface TreeNode {
+  name: string;
+  path: string;
+  kind: 'file' | 'dir';
+  children?: TreeNode[];
+}
+
+export interface WikiModel {
+  rootName: string;
+  files: WikiFile[];
+  byPath: Map<string, WikiFile>;
+  tree: TreeNode[];
+  graph: WikiGraph;
+  /** path → paths of pages that link to it. */
+  backlinks: Map<string, string[]>;
+  /** Resolve a `[[target]]` to a navigable href for the reader. */
+  resolve: (target: string) => WikiResolveResult;
+}
+
+interface RawFile {
+  handle: FileSystemFileHandle;
+  path: string;
+  name: string;
+}
+
+// ── Scanning ────────────────────────────────────────────────────────────────
+
+async function collectFiles(
+  dir: FileSystemDirectoryHandle,
+  base: string,
+  acc: RawFile[],
+): Promise<void> {
+  for await (const entry of dir.values()) {
+    if (entry.name.startsWith('.')) continue; // skip .obsidian, .git, …
+    const path = base ? `${base}/${entry.name}` : entry.name;
+    if (entry.kind === 'directory') {
+      await collectFiles(entry as FileSystemDirectoryHandle, path, acc);
+    } else if (MD_EXT.test(entry.name)) {
+      acc.push({ handle: entry as FileSystemFileHandle, path, name: entry.name });
+    }
+  }
+}
+
+/** Read a folder into a full wiki model. */
+export async function scanWiki(dir: FileSystemDirectoryHandle): Promise<WikiModel> {
+  const raw: RawFile[] = [];
+  await collectFiles(dir, '', raw);
+  const files = await Promise.all(
+    raw.map(async (rf) => {
+      let content = '';
+      try {
+        content = await (await rf.handle.getFile()).text();
+      } catch {
+        content = '';
+      }
+      return buildFile(rf, content);
+    }),
+  );
+  return buildModel(dir.name, files);
+}
+
+function buildFile(rf: RawFile, content: string): WikiFile {
+  const { data } = splitFrontmatter(content);
+  const slug = rf.name.replace(MD_EXT, '');
+  const segments = rf.path.split('/');
+  const parent = segments.length > 1 ? segments[segments.length - 2] : '(racine)';
+  const title = typeof data.title === 'string' && data.title.trim() ? data.title.trim() : slug;
+  const category =
+    typeof data.category === 'string' && data.category.trim() ? data.category.trim() : parent;
+  return {
+    path: rf.path,
+    name: rf.name,
+    slug,
+    title,
+    category,
+    tags: asList(data.tags),
+    group: category,
+    content,
+    handle: rf.handle,
+    outLinks: [],
+  };
+}
+
+// ── Model assembly (also used to rebuild after an edit) ───────────────────────
+
+export function buildModel(rootName: string, files: WikiFile[]): WikiModel {
+  const byPath = new Map(files.map((f) => [f.path, f]));
+
+  // Name index for [[wikilink]] resolution (first match wins).
+  const index = new Map<string, string>();
+  const addKey = (key: string, path: string): void => {
+    const k = normalizeKey(key);
+    if (k && !index.has(k)) index.set(k, path);
+  };
+  for (const f of files) {
+    addKey(f.slug, f.path);
+    addKey(f.title, f.path);
+    addKey(f.path.replace(MD_EXT, ''), f.path);
+  }
+
+  const resolveTarget = (target: string): string | null => {
+    const direct = index.get(normalizeKey(target));
+    if (direct) return direct;
+    const base = target.replace(/\\/g, '/').split('/').pop() ?? target;
+    return index.get(normalizeKey(base)) ?? null;
+  };
+
+  // Outgoing links per file (deduped, existing pages only).
+  for (const f of files) {
+    const set = new Set<string>();
+    for (const target of extractTargets(f)) {
+      const path = resolveTarget(target);
+      if (path && path !== f.path) set.add(path);
+    }
+    f.outLinks = [...set];
+  }
+
+  // Backlinks.
+  const backlinks = new Map<string, string[]>();
+  for (const f of files) {
+    for (const target of f.outLinks) {
+      const arr = backlinks.get(target) ?? [];
+      arr.push(f.path);
+      backlinks.set(target, arr);
+    }
+  }
+
+  // Graph (undirected, deduped).
+  const degree = new Map<string, number>();
+  const links: GraphLink[] = [];
+  const seen = new Set<string>();
+  for (const f of files) {
+    for (const target of f.outLinks) {
+      const key = `${f.path}\u0000${target}`;
+      const rev = `${target}\u0000${f.path}`;
+      if (seen.has(key) || seen.has(rev)) continue;
+      seen.add(key);
+      links.push({ source: f.path, target });
+      degree.set(f.path, (degree.get(f.path) ?? 0) + 1);
+      degree.set(target, (degree.get(target) ?? 0) + 1);
+    }
+  }
+  const nodes: GraphNode[] = files.map((f) => ({
+    id: f.path,
+    label: f.title,
+    group: f.group,
+    degree: degree.get(f.path) ?? 0,
+  }));
+
+  const resolve = (target: string): WikiResolveResult => {
+    const path = resolveTarget(target);
+    return path
+      ? { href: `#wiki/${encodeURIComponent(path)}`, exists: true }
+      : { href: '#wiki/missing', exists: false };
+  };
+
+  return {
+    rootName,
+    files,
+    byPath,
+    tree: buildTree(files),
+    graph: { nodes, links },
+    backlinks,
+    resolve,
+  };
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function normalizeKey(value: string): string {
+  return value
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(MD_EXT, '')
+    .toLowerCase()
+    .replace(/\s+/g, '-');
+}
+
+/** Remove fenced and inline code so links inside code aren't counted. */
+function stripCode(md: string): string {
+  return md.replace(/```[\s\S]*?```/g, '').replace(/`[^`]*`/g, '');
+}
+
+const WIKI_RE = /\[\[([^\]\n]+?)\]\]/g;
+const MDLINK_RE = /\]\(([^)]+?)\)/g;
+
+function extractTargets(file: WikiFile): string[] {
+  const body = stripCode(file.content);
+  const targets: string[] = [];
+
+  WIKI_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = WIKI_RE.exec(body)) !== null) {
+    const target = m[1].split('|')[0].split('#')[0].trim();
+    if (target) targets.push(target);
+  }
+
+  MDLINK_RE.lastIndex = 0;
+  while ((m = MDLINK_RE.exec(body)) !== null) {
+    let href = m[1].trim().split(/\s+/)[0]; // drop optional "title"
+    if (/^https?:/i.test(href) || href.startsWith('#') || href.startsWith('mailto:')) continue;
+    if (!/\.(md|markdown|mdown|mkd)(#|$)/i.test(href)) continue;
+    href = href.split('#')[0];
+    targets.push(resolveRelativePath(file.path, href).replace(MD_EXT, ''));
+  }
+
+  return targets;
+}
+
+function resolveRelativePath(fromPath: string, rel: string): string {
+  const stack = fromPath.split('/').slice(0, -1);
+  for (const part of rel.replace(/\\/g, '/').split('/')) {
+    if (part === '' || part === '.') continue;
+    if (part === '..') stack.pop();
+    else stack.push(part);
+  }
+  return stack.join('/');
+}
+
+function buildTree(files: WikiFile[]): TreeNode[] {
+  const root: TreeNode = { name: '', path: '', kind: 'dir', children: [] };
+  for (const f of files) {
+    const parts = f.path.split('/');
+    let cur = root;
+    for (let i = 0; i < parts.length; i++) {
+      const name = parts[i];
+      const path = parts.slice(0, i + 1).join('/');
+      if (i === parts.length - 1) {
+        cur.children!.push({ name, path, kind: 'file' });
+      } else {
+        let dir = cur.children!.find((c) => c.kind === 'dir' && c.name === name);
+        if (!dir) {
+          dir = { name, path, kind: 'dir', children: [] };
+          cur.children!.push(dir);
+        }
+        cur = dir;
+      }
+    }
+  }
+  sortTree(root);
+  return root.children ?? [];
+}
+
+function sortTree(node: TreeNode): void {
+  if (!node.children) return;
+  node.children.sort((a, b) =>
+    a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'dir' ? -1 : 1,
+  );
+  for (const child of node.children) sortTree(child);
+}
