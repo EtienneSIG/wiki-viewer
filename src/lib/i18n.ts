@@ -90,6 +90,51 @@ const STRINGS: Record<Locale, Dict> = {
     'excalidraw.zoomIn': 'Zoom in',
     'excalidraw.zoomOut': 'Zoom out',
     'excalidraw.fit': 'Fit',
+    'brand.wiki': 'Wiki',
+    'action.openWiki': 'Open a wiki',
+    'action.themeToggle': 'Change theme',
+    'action.themeTitle': 'Theme: {theme}',
+    'lang.toggle': 'Change language',
+    'lang.name': 'English',
+    'lang.short': 'EN',
+    'confirm.unsaved': 'Unsaved changes. Continue?',
+    'sidebar.pageCount': '{count} pages',
+    'status.indexing': 'indexing…',
+    'sidebar.noPages': 'No Markdown page found.',
+    'error.noMarkdownIn': 'No Markdown files found in “{name}”.',
+    'graph.indexing': 'Indexing the graph…',
+    'contacts.indexing': 'Indexing contacts…',
+    'reader.selectPage': 'Select a page in the tree.',
+    'empty.title': 'Wiki viewer',
+    'empty.desc1': 'Open a folder of Markdown notes to browse the tree, read and edit your pages, follow ',
+    'empty.desc2': ' links and explore the Obsidian-style graph.',
+    'empty.linkWord': 'links',
+    'empty.opening': 'Opening…',
+    'empty.reopen': 'Reopen “{name}”',
+    'backlinks.aria': 'Links',
+    'backlinks.title': 'Backlinks',
+    'backlinks.none': 'No page links here.',
+    'backlinks.outgoing': 'Outgoing links',
+    'backlinks.outNone': 'This page links to nothing.',
+    'graph.filters': 'Graph filters',
+    'graph.searchPage': 'Search a page…',
+    'graph.orphans': 'Orphans',
+    'graph.labels': 'Labels',
+    'graph.spacing': 'Spacing',
+    'graph.spacingAria': 'Spacing between nodes',
+    'graph.filterClient': 'Filter by client',
+    'graph.allClients': 'All clients',
+    'graph.reorganize': 'Reorganize',
+    'graph.resetView': 'Reset view',
+    'graph.hint': 'Wheel: zoom · Drag: pan · Click: open',
+    'status.appInfo': 'Application information',
+    'status.license': 'License {license}',
+    'update.check': 'Check for updates',
+    'update.checking': 'Checking…',
+    'update.upToDate': 'Up to date',
+    'update.unavailable': 'Check unavailable',
+    'update.badge': 'Update {version}',
+    'update.availableTitle': 'Version {version} available',
   },
   fr: {
     'app.title': 'Markdit',
@@ -175,15 +220,99 @@ const STRINGS: Record<Locale, Dict> = {
     'excalidraw.zoomIn': 'Zoom avant',
     'excalidraw.zoomOut': 'Zoom arrière',
     'excalidraw.fit': 'Ajuster',
+    'brand.wiki': 'Wiki',
+    'action.openWiki': 'Ouvrir un wiki',
+    'action.themeToggle': 'Changer de thème',
+    'action.themeTitle': 'Thème : {theme}',
+    'lang.toggle': 'Changer de langue',
+    'lang.name': 'Français',
+    'lang.short': 'FR',
+    'confirm.unsaved': 'Modifications non enregistrées. Continuer ?',
+    'sidebar.pageCount': '{count} pages',
+    'status.indexing': 'indexation…',
+    'sidebar.noPages': 'Aucune page Markdown trouvée.',
+    'error.noMarkdownIn': 'Aucun fichier Markdown trouvé dans « {name} ».',
+    'graph.indexing': 'Indexation du graphe en cours…',
+    'contacts.indexing': 'Indexation des contacts en cours…',
+    'reader.selectPage': 'Sélectionnez une page dans l’arborescence.',
+    'empty.title': 'Visualiseur de wiki',
+    'empty.desc1': 'Ouvrez un dossier de notes Markdown pour parcourir l’arborescence, lire et éditer vos pages, suivre les ',
+    'empty.desc2': ' et explorer le graphe façon Obsidian.',
+    'empty.linkWord': 'liens',
+    'empty.opening': 'Ouverture…',
+    'empty.reopen': 'Rouvrir « {name} »',
+    'backlinks.aria': 'Liens',
+    'backlinks.title': 'Backlinks',
+    'backlinks.none': 'Aucune page ne pointe ici.',
+    'backlinks.outgoing': 'Liens sortants',
+    'backlinks.outNone': 'Cette page ne pointe vers rien.',
+    'graph.filters': 'Filtres du graphe',
+    'graph.searchPage': 'Rechercher une page…',
+    'graph.orphans': 'Orphelins',
+    'graph.labels': 'Étiquettes',
+    'graph.spacing': 'Espacement',
+    'graph.spacingAria': 'Espacement entre les nœuds',
+    'graph.filterClient': 'Filtrer par client',
+    'graph.allClients': 'Tous les clients',
+    'graph.reorganize': 'Réorganiser',
+    'graph.resetView': 'Réinitialiser la vue',
+    'graph.hint': 'Molette : zoom · Glisser : déplacer · Clic : ouvrir',
+    'status.appInfo': 'Informations sur l’application',
+    'status.license': 'Licence {license}',
+    'update.check': 'Vérifier les mises à jour',
+    'update.checking': 'Vérification…',
+    'update.upToDate': 'À jour',
+    'update.unavailable': 'Vérification indisponible',
+    'update.badge': 'Mise à jour {version}',
+    'update.availableTitle': 'Version {version} disponible',
   },
 };
 
-let current: Locale = 'fr';
+export const LOCALES: Locale[] = ['fr', 'en'];
 
-export function setLocale(locale: string): void {
-  current = locale.startsWith('fr') ? 'fr' : 'en';
+const STORAGE_KEY = 'wv-lang';
+
+function normalize(locale: string): Locale {
+  return locale.toLowerCase().startsWith('fr') ? 'fr' : 'en';
 }
 
-export function t(key: string): string {
-  return STRINGS[current][key] ?? STRINGS.en[key] ?? key;
+function detectInitial(): Locale {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) return normalize(saved);
+  } catch {
+    /* ignore private-mode errors */
+  }
+  // English is the default language when the user has no saved preference.
+  return 'en';
+}
+
+let current: Locale = detectInitial();
+
+export function getLocale(): Locale {
+  return current;
+}
+
+export function setLocale(locale: string): Locale {
+  current = normalize(locale);
+  try {
+    localStorage.setItem(STORAGE_KEY, current);
+  } catch {
+    /* ignore quota / private-mode errors */
+  }
+  return current;
+}
+
+/**
+ * Look up a localized string, falling back to English then the raw key.
+ * `{placeholder}` tokens are replaced from `params` when provided.
+ */
+export function t(key: string, params?: Record<string, string | number>): string {
+  let text = STRINGS[current][key] ?? STRINGS.en[key] ?? key;
+  if (params) {
+    for (const [name, value] of Object.entries(params)) {
+      text = text.replace(new RegExp(`\\{${name}\\}`, 'g'), String(value));
+    }
+  }
+  return text;
 }

@@ -11,6 +11,7 @@ import {
 } from 'd3-force';
 import type { WikiGraph } from '../../lib/wiki';
 import type { ThemeId } from '../../lib/types';
+import { t } from '../../lib/i18n';
 
 export interface GraphViewProps {
   graph: WikiGraph;
@@ -542,11 +543,11 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder 
     <div className="wv-graph" ref={wrapRef}>
       <canvas ref={canvasRef} className="wv-graph-canvas" />
 
-      <div className="wv-graph-panel" role="group" aria-label="Filtres du graphe">
+      <div className="wv-graph-panel" role="group" aria-label={t('graph.filters')}>
         <input
           type="search"
           className="wv-graph-search"
-          placeholder={searchPlaceholder ?? 'Rechercher une page…'}
+          placeholder={searchPlaceholder ?? t('graph.searchPage')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -556,7 +557,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder 
             checked={showOrphans}
             onChange={(e) => setShowOrphans(e.target.checked)}
           />
-          Orphelins
+          {t('graph.orphans')}
         </label>
         <label className="wv-graph-toggle">
           <input
@@ -564,10 +565,10 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder 
             checked={showLabels}
             onChange={(e) => setShowLabels(e.target.checked)}
           />
-          Étiquettes
+          {t('graph.labels')}
         </label>
         <label className="wv-graph-slider">
-          <span>Espacement</span>
+          <span>{t('graph.spacing')}</span>
           <input
             type="range"
             min={0.8}
@@ -575,7 +576,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder 
             step={0.1}
             value={spacing}
             onChange={(e) => setSpacing(Number(e.target.value))}
-            aria-label="Espacement entre les nœuds"
+            aria-label={t('graph.spacingAria')}
           />
         </label>
         {clientOptions.length > 0 && (
@@ -583,10 +584,10 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder 
             className="wv-graph-select"
             value={clientFilter}
             onChange={(e) => setClientFilter(e.target.value)}
-            aria-label="Filtrer par client"
-            title="Filtrer par client"
+            aria-label={t('graph.filterClient')}
+            title={t('graph.filterClient')}
           >
-            <option value="">Tous les clients</option>
+            <option value="">{t('graph.allClients')}</option>
             {clientOptions.map((c) => (
               <option key={c} value={c}>
                 {c.charAt(0).toUpperCase() + c.slice(1)}
@@ -596,10 +597,10 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder 
         )}
         <div className="wv-graph-buttons">
           <button type="button" className="wv-graph-reset" onClick={reorganize}>
-            Réorganiser
+            {t('graph.reorganize')}
           </button>
           <button type="button" className="wv-graph-reset" onClick={resetView}>
-            Réinitialiser la vue
+            {t('graph.resetView')}
           </button>
         </div>
         {legend.length > 0 && (
@@ -615,7 +616,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder 
       </div>
 
       <div className="wv-graph-hint" aria-hidden="true">
-        Molette : zoom · Glisser : déplacer · Clic : ouvrir
+        {t('graph.hint')}
       </div>
     </div>
   );

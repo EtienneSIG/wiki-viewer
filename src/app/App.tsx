@@ -5,12 +5,13 @@ import { Editor } from '../components/editor/Editor';
 import { FileTree } from '../components/sidebar/FileTree';
 import { Backlinks } from '../components/backlinks/Backlinks';
 import { GraphView } from '../components/graph/GraphView';
+import { StatusBar } from '../components/statusbar/StatusBar';
 import { scanEntries, buildLightModel, readEntries, buildModel, type WikiModel } from '../lib/wiki';
 import { buildContactsGraph } from '../lib/contacts';
 import { splitFrontmatter, joinFrontmatter } from '../lib/frontmatter';
 import { writeFileHandle, loadFolders, saveFolders, readFileAtPath } from '../lib/folder-handle';
 import { applyTheme } from './theme';
-import { t } from '../lib/i18n';
+import { t, getLocale, setLocale, type Locale } from '../lib/i18n';
 import type { ThemeId } from '../lib/types';
 
 type ViewMode = 'read' | 'edit' | 'graph' | 'contacts';
@@ -48,6 +49,7 @@ export function App(): JSX.Element {
 
   const [view, setView] = useState<ViewMode>('read');
   const [theme, setTheme] = useState<ThemeId>('system');
+  const [locale, setLocaleState] = useState<Locale>(() => getLocale());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [indexing, setIndexing] = useState(false);
@@ -122,7 +124,7 @@ export function App(): JSX.Element {
         setReopenDir(null);
         void saveFolders([dir]);
         if (entries.length === 0) {
-          setError(`Aucun fichier Markdown trouvé dans « ${rootName} ».`);
+          setError(t('error.noMarkdownIn', { name: rootName }));
         }
         const initial = pickInitial(light);
         if (initial) {
@@ -130,7 +132,6 @@ export function App(): JSX.Element {
           setView('read');
         }
         setLoading(false);
-
         // Phase 2 (background): read every file, compute graph + backlinks.
         if (entries.length > 0) {
           setIndexing(true);
@@ -167,6 +168,11 @@ export function App(): JSX.Element {
     applyTheme(theme);
   }, [theme]);
 
+  // Reflect the active locale on the document element for a11y / CSS hooks.
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
+
   const openWiki = useCallback(async (): Promise<void> => {
     if (!window.showDirectoryPicker) {
       setError(t('sidebar.unsupported'));
@@ -196,7 +202,7 @@ export function App(): JSX.Element {
   const openPath = useCallback(
     (path: string): void => {
       if (!model) return;
-      if (dirty && !window.confirm('Modifications non enregistrées. Continuer ?')) return;
+      if (dirty && !window.confirm(t('confirm.unsaved'))) return;
       void openFile(model, path);
       // Excalidraw diagrams have no editable source view; always show them in read.
       const target = model.byPath.get(path);
@@ -277,6 +283,10 @@ export function App(): JSX.Element {
     setTheme((cur) => THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length]);
   }, []);
 
+  const toggleLocale = useCallback(() => {
+    setLocaleState((cur) => setLocale(cur === 'fr' ? 'en' : 'fr'));
+  }, []);
+
   const fileLabel = activeFile?.name ?? '—';
 
   return (
@@ -299,7 +309,7 @@ export function App(): JSX.Element {
           </button>
           <span className="markdit-brand">
             <span className="markdit-brand-mark" aria-hidden="true">W</span>
-            Wiki
+            {t('brand.wiki')}
           </span>
           {model && (
             <>
@@ -338,7 +348,14 @@ export function App(): JSX.Element {
         )}
 
         <nav className="markdit-topbar-right markdit-actions" aria-label="Actions">
-          <button type="button" onClick={cycleTheme} title={`Thème : ${theme}`} aria-label="Changer de thème">
+          <button type="button" onClick={toggleLocale} title={t('lang.toggle')} aria-label={t('lang.toggle')}>
+            <svg className="markdit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
+            </svg>
+            {t('lang.short')}
+          </button>
+          <button type="button" onClick={cycleTheme} title={t('action.themeTitle', { theme })} aria-label={t('action.themeToggle')}>
             <svg className="markdit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="4" />
               <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4" />
@@ -378,7 +395,7 @@ export function App(): JSX.Element {
             <svg className="markdit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
             </svg>
-            Ouvrir un wiki
+            {t('action.openWiki')}
           </button>
         </nav>
       </header>
@@ -407,12 +424,12 @@ export function App(): JSX.Element {
             </div>
             <div className="markdit-sidebar-body">
               <span className="wv-count wv-filecount">
-                {model.files.length} pages
-                {indexing && <span className="wv-indexing"> · indexation…</span>}
+                {t('sidebar.pageCount', { count: model.files.length })}
+                {indexing && <span className="wv-indexing"> · {t('status.indexing')}</span>}
               </span>
               {error && <p className="wv-empty-error wv-sidebar-error">{error}</p>}
               {model.files.length === 0 && !error && (
-                <p className="markdit-sidebar-empty">Aucune page Markdown trouvée.</p>
+                <p className="markdit-sidebar-empty">{t('sidebar.noPages')}</p>
               )}
               <FileTree nodes={model.tree} activePath={activePath} onSelect={openPath} />
             </div>
@@ -426,7 +443,7 @@ export function App(): JSX.Element {
             model.graph.links.length === 0 && indexing ? (
               <div className="wv-empty">
                 <div className="wv-empty-card">
-                  <p className="wv-empty-text">Indexation du graphe en cours…</p>
+                  <p className="wv-empty-text">{t('graph.indexing')}</p>
                 </div>
               </div>
             ) : (
@@ -445,7 +462,7 @@ export function App(): JSX.Element {
               <div className="wv-empty">
                 <div className="wv-empty-card">
                   <p className="wv-empty-text">
-                    {indexing ? 'Indexation des contacts en cours…' : t('contacts.empty')}
+                    {indexing ? t('contacts.indexing') : t('contacts.empty')}
                   </p>
                 </div>
               </div>
@@ -484,7 +501,7 @@ export function App(): JSX.Element {
                     />
                   )
                 ) : (
-                  <p className="markdit-sidebar-empty">Sélectionnez une page dans l’arborescence.</p>
+                  <p className="markdit-sidebar-empty">{t('reader.selectPage')}</p>
                 )}
               </div>
               {activePath && view === 'read' && !isExcalidraw && (
@@ -494,6 +511,7 @@ export function App(): JSX.Element {
           )}
         </main>
       </div>
+      <StatusBar />
     </div>
   );
 }
@@ -513,19 +531,20 @@ function EmptyState({ onOpen, reopenDir, onReopen, loading, error }: EmptyStateP
         <svg className="wv-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
         </svg>
-        <h1 className="wv-empty-title">Visualiseur de wiki</h1>
+        <h1 className="wv-empty-title">{t('empty.title')}</h1>
         <p className="wv-empty-text">
-          Ouvrez un dossier de notes Markdown pour parcourir l’arborescence, lire et éditer vos
-          pages, suivre les <code>[[liens]]</code> et explorer le graphe façon Obsidian.
+          {t('empty.desc1')}
+          <code>[[{t('empty.linkWord')}]]</code>
+          {t('empty.desc2')}
         </p>
         {error && <p className="wv-empty-error">{error}</p>}
         <div className="wv-empty-actions">
           <button type="button" className="wv-empty-cta" onClick={onOpen} disabled={loading}>
-            {loading ? 'Ouverture…' : 'Ouvrir un wiki'}
+            {loading ? t('empty.opening') : t('action.openWiki')}
           </button>
           {reopenDir && (
             <button type="button" className="wv-empty-reopen" onClick={onReopen} disabled={loading}>
-              Rouvrir « {reopenDir.name} »
+              {t('empty.reopen', { name: reopenDir.name })}
             </button>
           )}
         </div>

@@ -1,5 +1,17 @@
 /// <reference types="vite/client" />
 
+// Injected at build time by Vite `define` (see vite.config.ts).
+declare const __APP_VERSION__: string;
+declare const __APP_LICENSE__: string;
+
+// Optional bridge exposed by the Electron preload script.
+interface Window {
+  desktop?: {
+    isElectron: boolean;
+    platform: string;
+  };
+}
+
 // Minimal File System Access API declarations (browser folder browsing).
 interface FileSystemHandlePermissionDescriptor {
   mode?: 'read' | 'readwrite';

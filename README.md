@@ -23,6 +23,9 @@ et bâtie sur le moteur de rendu/édition de [**Markdit**](https://github.com/Et
 - **Backlinks** — panneau latéral listant les pages qui pointent vers la page
   courante, plus ses liens sortants.
 - **Thèmes** — système / clair / sombre / contraste élevé.
+- **Multilingue** — interface en **français** et **anglais** ; bascule via le bouton
+  langue de la barre d'outils. La langue est détectée depuis le navigateur au premier
+  lancement puis mémorisée.
 
 ## Prérequis
 
@@ -50,6 +53,46 @@ npm run build      # vérifie les types (tsc) puis génère dist/
 npm run preview    # sert le build de production
 ```
 
+## Applications desktop (Windows & macOS)
+
+L'application est empaquetée avec [Electron](https://www.electronjs.org/) via
+[electron-builder]. Le rendu reste le même code web ; l'API File System Access et
+IndexedDB fonctionnent dans le runtime Chromium d'Electron.
+
+```bash
+npm run electron:dev     # lance l'app Electron sur le serveur de dev Vite
+npm run release:win      # génère un installateur Windows (NSIS) dans release/
+npm run release:mac      # génère un .dmg (x64 + arm64) — nécessite macOS
+npm run release:all      # les deux (chaque cible sur son OS natif)
+```
+
+Les artefacts sont produits dans le dossier `release/`.
+
+### Générer les deux plateformes automatiquement
+
+macOS ne peut pas être compilé depuis Windows (ni l'inverse pour la signature).
+Le workflow [`.github/workflows/release.yml`](.github/workflows/release.yml)
+construit **Windows + macOS** sur des runners natifs et publie une GitHub Release :
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0   # déclenche le build multi-plateforme + la release
+```
+
+(Ou déclenchement manuel via l'onglet *Actions* → *Release* → *Run workflow*.)
+
+### Build Windows local
+
+- `npm run release:win` produit un **installateur NSIS**. La création de
+  l'installateur signé requiert l'extraction de `winCodeSign`, qui a besoin du
+  **Mode développeur Windows** activé (ou d'un terminal *Administrateur*) pour créer
+  des liens symboliques.
+- Sans ces droits, utilisez `npx electron-builder --win --dir` : cela génère une
+  application décompressée fonctionnelle dans `release/win-unpacked/`
+  (`Wiki Viewer.exe`), sans installateur ni signature.
+
+[electron-builder]: https://www.electron.build/
+
 ## Notes techniques
 
 - **Réutilise Markdit tel quel** pour le pipeline Markdown
@@ -68,6 +111,10 @@ npm run preview    # sert le build de production
 - **Persistance** : seuls des handles opaques de dossier sont stockés dans
   IndexedDB ; rien ne quitte l'appareil.
 - Le port de dev est **1421** (Markdit utilise 1420).
+
+## Licence
+
+Distribué sous licence [MIT](LICENSE). © 2026 EtienneSIG.
 
 ## Structure
 

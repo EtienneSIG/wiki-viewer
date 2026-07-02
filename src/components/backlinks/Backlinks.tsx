@@ -1,4 +1,5 @@
 import type { WikiModel } from '../../lib/wiki';
+import { t } from '../../lib/i18n';
 
 export interface BacklinksProps {
   model: WikiModel;
@@ -21,13 +22,13 @@ export function Backlinks({ model, activePath, onNavigate }: BacklinksProps): JS
   );
 
   return (
-    <aside className="wv-backlinks" aria-label="Liens">
+    <aside className="wv-backlinks" aria-label={t('backlinks.aria')}>
       <section>
         <h3 className="wv-backlinks-title">
-          Backlinks <span className="wv-count">{sources.length}</span>
+          {t('backlinks.title')} <span className="wv-count">{sources.length}</span>
         </h3>
         {sources.length === 0 ? (
-          <p className="wv-backlinks-empty">Aucune page ne pointe ici.</p>
+          <p className="wv-backlinks-empty">{t('backlinks.none')}</p>
         ) : (
           <ul className="wv-backlinks-list">
             {sources.map((path) => (
@@ -43,10 +44,10 @@ export function Backlinks({ model, activePath, onNavigate }: BacklinksProps): JS
 
       <section>
         <h3 className="wv-backlinks-title">
-          Liens sortants <span className="wv-count">{outgoing.length}</span>
+          {t('backlinks.outgoing')} <span className="wv-count">{outgoing.length}</span>
         </h3>
         {outgoing.length === 0 ? (
-          <p className="wv-backlinks-empty">Cette page ne pointe vers rien.</p>
+          <p className="wv-backlinks-empty">{t('backlinks.outNone')}</p>
         ) : (
           <ul className="wv-backlinks-list">
             {outgoing.map((path) => (
