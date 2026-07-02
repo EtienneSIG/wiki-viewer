@@ -380,6 +380,8 @@ function buildTree(files: WikiFile[]): TreeNode[] {
   const root: TreeNode = { name: '', path: '', kind: 'dir', children: [] };
   for (const f of files) {
     const parts = f.path.split('/');
+    // Hide underscore-prefixed files and folders (e.g. _index.md, _queries/).
+    if (parts.some((p) => p.startsWith('_'))) continue;
     let cur = root;
     for (let i = 0; i < parts.length; i++) {
       const name = parts[i];
