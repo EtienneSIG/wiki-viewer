@@ -6,11 +6,19 @@ export interface BacklinksProps {
   onNavigate: (path: string) => void;
 }
 
+/** Hide index/underscore pages (e.g. `_index.md`) from the links panel. */
+function isUnderscoreFile(path: string): boolean {
+  const base = path.split('/').pop() ?? path;
+  return base.startsWith('_');
+}
+
 /** Right-hand panel: pages that link to the current page (like Obsidian backlinks). */
 export function Backlinks({ model, activePath, onNavigate }: BacklinksProps): JSX.Element {
-  const sources = model.backlinks.get(activePath) ?? [];
+  const sources = (model.backlinks.get(activePath) ?? []).filter((p) => !isUnderscoreFile(p));
   const active = model.byPath.get(activePath);
-  const outgoing = (active?.outLinks ?? []).filter((p) => model.byPath.has(p));
+  const outgoing = (active?.outLinks ?? []).filter(
+    (p) => model.byPath.has(p) && !isUnderscoreFile(p),
+  );
 
   return (
     <aside className="wv-backlinks" aria-label="Liens">
