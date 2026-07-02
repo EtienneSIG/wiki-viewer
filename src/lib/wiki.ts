@@ -7,6 +7,10 @@ import { splitFrontmatter, asList } from './frontmatter';
 import type { WikiResolveResult } from '../markdown/remark-wikilink';
 
 const MD_EXT = /\.(md|markdown|mdown|mkd)$/i;
+const EXCALIDRAW_EXT = /\.excalidraw$/i;
+
+/** Kind of a scanned file. Markdown drives the graph; excalidraw is a diagram asset. */
+export type WikiFileKind = 'markdown' | 'excalidraw';
 
 /**
  * Directories that never contain wiki content but can hold hundreds of
@@ -34,6 +38,8 @@ export interface WikiFile {
   name: string;
   /** Basename without extension (e.g. `foo`). */
   slug: string;
+  /** markdown page, or excalidraw diagram asset. */
+  kind: WikiFileKind;
   /** Display title — frontmatter `title` or the slug. */
   title: string;
   /** Frontmatter `category`, else the immediate parent folder. Drives graph color. */
@@ -71,6 +77,8 @@ export interface TreeNode {
   name: string;
   path: string;
   kind: 'file' | 'dir';
+  /** For file nodes: the underlying file kind (drives the tree icon). */
+  fileType?: WikiFileKind;
   children?: TreeNode[];
 }
 
@@ -115,7 +123,7 @@ async function collectFiles(
       const path = base ? `${base}/${entry.name}` : entry.name;
       if (entry.kind === 'directory') {
         await collectFiles(entry as FileSystemDirectoryHandle, path, acc);
-      } else if (MD_EXT.test(entry.name)) {
+      } else if (MD_EXT.test(entry.name) || EXCALIDRAW_EXT.test(entry.name)) {
         acc.push({ handle: entry as FileSystemFileHandle, path, name: entry.name });
       }
     }
@@ -193,10 +201,29 @@ export async function readEntries(
 }
 
 function buildFile(rf: RawFile, content: string): WikiFile {
-  const { data } = splitFrontmatter(content);
-  const slug = rf.name.replace(MD_EXT, '');
+  const isExcalidraw = EXCALIDRAW_EXT.test(rf.name);
   const segments = rf.path.split('/');
   const parent = segments.length > 1 ? segments[segments.length - 2] : '(racine)';
+
+  if (isExcalidraw) {
+    const slug = rf.name.replace(EXCALIDRAW_EXT, '');
+    return {
+      path: rf.path,
+      name: rf.name,
+      slug,
+      kind: 'excalidraw',
+      title: slug,
+      category: parent,
+      tags: [],
+      group: parent,
+      content,
+      handle: rf.handle,
+      outLinks: [],
+    };
+  }
+
+  const { data } = splitFrontmatter(content);
+  const slug = rf.name.replace(MD_EXT, '');
   const title = typeof data.title === 'string' && data.title.trim() ? data.title.trim() : slug;
   const category =
     typeof data.category === 'string' && data.category.trim() ? data.category.trim() : parent;
@@ -204,6 +231,7 @@ function buildFile(rf: RawFile, content: string): WikiFile {
     path: rf.path,
     name: rf.name,
     slug,
+    kind: 'markdown',
     title,
     category,
     tags: asList(data.tags),
@@ -219,13 +247,15 @@ function buildFile(rf: RawFile, content: string): WikiFile {
 export function buildModel(rootName: string, files: WikiFile[]): WikiModel {
   const byPath = new Map(files.map((f) => [f.path, f]));
 
-  // Name index for [[wikilink]] resolution (first match wins).
+  // Name index for [[wikilink]] resolution (first match wins). Only Markdown
+  // pages are link targets; excalidraw diagrams are openable assets, not pages.
   const index = new Map<string, string>();
   const addKey = (key: string, path: string): void => {
     const k = normalizeKey(key);
     if (k && !index.has(k)) index.set(k, path);
   };
   for (const f of files) {
+    if (f.kind !== 'markdown') continue;
     addKey(f.slug, f.path);
     addKey(f.title, f.path);
     addKey(f.path.replace(MD_EXT, ''), f.path);
@@ -238,8 +268,13 @@ export function buildModel(rootName: string, files: WikiFile[]): WikiModel {
     return index.get(normalizeKey(base)) ?? null;
   };
 
-  // Outgoing links per file (deduped, existing pages only).
+  // Outgoing links per file (deduped, existing pages only). Excalidraw assets
+  // don't participate in the link graph.
   for (const f of files) {
+    if (f.kind !== 'markdown') {
+      f.outLinks = [];
+      continue;
+    }
     const set = new Set<string>();
     for (const target of extractTargets(f)) {
       const path = resolveTarget(target);
@@ -298,13 +333,17 @@ export function buildModel(rootName: string, files: WikiFile[]): WikiModel {
     return [...found];
   };
 
-  const nodes: GraphNode[] = files.map((f) => ({
-    id: f.path,
-    label: f.title,
-    group: f.group,
-    degree: degree.get(f.path) ?? 0,
-    clients: clientsOf(f),
-  }));
+  // Graph nodes are Markdown pages only; excalidraw assets stay in the tree but
+  // out of the graph to avoid isolated clutter.
+  const nodes: GraphNode[] = files
+    .filter((f) => f.kind === 'markdown')
+    .map((f) => ({
+      id: f.path,
+      label: f.title,
+      group: f.group,
+      degree: degree.get(f.path) ?? 0,
+      clients: clientsOf(f),
+    }));
 
   const resolve = (target: string): WikiResolveResult => {
     const path = resolveTarget(target);
@@ -402,7 +441,7 @@ function buildTree(files: WikiFile[]): TreeNode[] {
       const name = parts[i];
       const path = parts.slice(0, i + 1).join('/');
       if (i === parts.length - 1) {
-        cur.children!.push({ name, path, kind: 'file' });
+        cur.children!.push({ name, path, kind: 'file', fileType: f.kind });
       } else {
         let dir = cur.children!.find((c) => c.kind === 'dir' && c.name === name);
         if (!dir) {

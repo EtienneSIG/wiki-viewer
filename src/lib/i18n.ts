@@ -79,6 +79,11 @@ const STRINGS: Record<Locale, Dict> = {
       'This file was modified outside Markdit. Reload the version on disk (your unsaved changes will be lost) or keep editing your version.',
     'conflict.reload': 'Reload from disk',
     'conflict.keep': 'Keep my version',
+    'excalidraw.diagram': 'Excalidraw diagram',
+    'excalidraw.invalid': 'This Excalidraw file could not be read.',
+    'excalidraw.zoomIn': 'Zoom in',
+    'excalidraw.zoomOut': 'Zoom out',
+    'excalidraw.fit': 'Fit',
   },
   fr: {
     'app.title': 'Markdit',
@@ -153,6 +158,11 @@ const STRINGS: Record<Locale, Dict> = {
       "Ce fichier a été modifié en dehors de Markdit. Rechargez la version du disque (vos modifications non enregistrées seront perdues) ou continuez avec votre version.",
     'conflict.reload': 'Recharger depuis le disque',
     'conflict.keep': 'Conserver ma version',
+    'excalidraw.diagram': 'Diagramme Excalidraw',
+    'excalidraw.invalid': "Ce fichier Excalidraw n'a pas pu être lu.",
+    'excalidraw.zoomIn': 'Zoom avant',
+    'excalidraw.zoomOut': 'Zoom arrière',
+    'excalidraw.fit': 'Ajuster',
   },
 };
 

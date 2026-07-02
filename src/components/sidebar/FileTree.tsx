@@ -26,13 +26,18 @@ export function FileTree({ nodes, activePath, onSelect, depth = 1 }: FileTreePro
             <button
               type="button"
               className={`markdit-tree-row markdit-tree-file${
-                activePath === node.path ? ' is-active' : ''
-              }`}
+                node.fileType === 'excalidraw' ? ' markdit-tree-excalidraw' : ''
+              }${activePath === node.path ? ' is-active' : ''}`}
               style={{ paddingLeft: `${depth * 0.75 + 0.5}rem` }}
               title={node.name}
               onClick={() => onSelect(node.path)}
             >
-              {node.name.replace(/\.(md|markdown|mdown|mkd)$/i, '')}
+              {node.fileType === 'excalidraw' && (
+                <span className="markdit-tree-badge" aria-hidden="true">
+                  ✎
+                </span>
+              )}
+              {node.name.replace(/\.(excalidraw|md|markdown|mdown|mkd)$/i, '')}
             </button>
           </li>
         ),

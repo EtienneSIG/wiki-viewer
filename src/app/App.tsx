@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Reader } from '../components/reader/Reader';
+import { ExcalidrawView } from '../components/reader/ExcalidrawView';
 import { Editor } from '../components/editor/Editor';
 import { FileTree } from '../components/sidebar/FileTree';
 import { Backlinks } from '../components/backlinks/Backlinks';
 import { GraphView } from '../components/graph/GraphView';
 import { scanEntries, buildLightModel, readEntries, buildModel, type WikiModel } from '../lib/wiki';
 import { splitFrontmatter, joinFrontmatter } from '../lib/frontmatter';
-import { writeFileHandle, loadFolders, saveFolders } from '../lib/folder-handle';
+import { writeFileHandle, loadFolders, saveFolders, readFileAtPath } from '../lib/folder-handle';
 import { applyTheme } from './theme';
 import { t } from '../lib/i18n';
 import type { ThemeId } from '../lib/types';
@@ -49,6 +50,19 @@ export function App(): JSX.Element {
 
   const resolvedTheme = useMemo(() => resolveTheme(theme), [theme]);
   const activeFile = model && activePath ? model.byPath.get(activePath) ?? null : null;
+  const isExcalidraw = activeFile?.kind === 'excalidraw';
+
+  // Resolve a root-relative asset path (e.g. an image referenced from Markdown)
+  // to an object URL, reading it from the opened folder. Stays offline-first.
+  const resolveAsset = useCallback(
+    async (path: string): Promise<string | null> => {
+      if (!rootDir) return null;
+      const file = await readFileAtPath(rootDir, path);
+      if (!file) return null;
+      return URL.createObjectURL(file);
+    },
+    [rootDir],
+  );
 
   // Load the frontmatter/body of a file within a given model. Content is read
   // lazily from disk on first open (the model may only hold entry metadata).
@@ -166,7 +180,9 @@ export function App(): JSX.Element {
       if (!model) return;
       if (dirty && !window.confirm('Modifications non enregistrées. Continuer ?')) return;
       void openFile(model, path);
-      if (view === 'graph') setView('read');
+      // Excalidraw diagrams have no editable source view; always show them in read.
+      const target = model.byPath.get(path);
+      if (view === 'graph' || target?.kind === 'excalidraw') setView('read');
     },
     [model, dirty, view, openFile],
   );
@@ -256,7 +272,7 @@ export function App(): JSX.Element {
               <button type="button" onClick={() => setView('read')} aria-pressed={view === 'read'} disabled={!activeFile}>
                 {t('view.read')}
               </button>
-              <button type="button" onClick={() => setView('edit')} aria-pressed={view === 'edit'} disabled={!activeFile}>
+              <button type="button" onClick={() => setView('edit')} aria-pressed={view === 'edit'} disabled={!activeFile || isExcalidraw}>
                 {t('view.edit')}
               </button>
               <button type="button" onClick={() => setView('graph')} aria-pressed={view === 'graph'}>
@@ -274,7 +290,7 @@ export function App(): JSX.Element {
             </svg>
           </button>
           {model && (
-            <button type="button" onClick={handleSave} disabled={!activeFile || saveStatus === 'saving'} title={t('action.save')}>
+            <button type="button" onClick={handleSave} disabled={!activeFile || isExcalidraw || saveStatus === 'saving'} title={t('action.save')}>
               <svg className="markdit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 {saveStatus === 'saved' ? (
                   <path d="m5 13 4 4L19 7" />
@@ -349,7 +365,7 @@ export function App(): JSX.Element {
           ) : (
             <div className="wv-doc">
               <div className="wv-doc-main">
-                {activeFile && (activeFile.tags.length > 0 || activeFile.category) && (
+                {activeFile && !isExcalidraw && (activeFile.tags.length > 0 || activeFile.category) && (
                   <div className="wv-properties">
                     {activeFile.category && <span className="wv-chip wv-chip-cat">{activeFile.category}</span>}
                     {activeFile.tags.map((tag) => (
@@ -358,13 +374,17 @@ export function App(): JSX.Element {
                   </div>
                 )}
                 {activeFile ? (
-                  view === 'read' ? (
+                  isExcalidraw ? (
+                    <ExcalidrawView source={body} />
+                  ) : view === 'read' ? (
                     <Reader
                       markdown={body}
                       allowRemoteContent={false}
                       theme={resolvedTheme}
                       wikiResolve={model.resolve}
                       onNavigate={openPath}
+                      basePath={activePath ?? undefined}
+                      resolveAsset={resolveAsset}
                     />
                   ) : (
                     <Editor
@@ -379,7 +399,7 @@ export function App(): JSX.Element {
                   <p className="markdit-sidebar-empty">Sélectionnez une page dans l’arborescence.</p>
                 )}
               </div>
-              {activePath && view === 'read' && (
+              {activePath && view === 'read' && !isExcalidraw && (
                 <Backlinks model={model} activePath={activePath} onNavigate={openPath} />
               )}
             </div>

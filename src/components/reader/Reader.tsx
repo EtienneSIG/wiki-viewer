@@ -15,6 +15,10 @@ export interface ReaderProps {
   wikiResolve?: (target: string) => WikiResolveResult;
   /** Called when the user clicks a resolved wikilink (path relative to root). */
   onNavigate?: (path: string) => void;
+  /** Root-relative path of the file being read; used to resolve relative links/images. */
+  basePath?: string;
+  /** Resolve a root-relative asset path to an object URL (omit to skip local images). */
+  resolveAsset?: (path: string) => Promise<string | null>;
 }
 
 /**
@@ -29,6 +33,8 @@ export function Reader({
   theme,
   wikiResolve,
   onNavigate,
+  basePath,
+  resolveAsset,
 }: ReaderProps): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -58,9 +64,20 @@ export function Reader({
       } else if (/^https?:\/\//i.test(href)) {
         e.preventDefault();
         window.open(href, '_blank', 'noopener,noreferrer');
+      } else if (
+        href &&
+        !href.startsWith('#') &&
+        !/^[a-z]+:/i.test(href) &&
+        /\.(excalidraw|md|markdown|mdown|mkd)(#|$)/i.test(href) &&
+        basePath
+      ) {
+        // Relative link to another wiki file (e.g. a power-map diagram).
+        e.preventDefault();
+        const target = resolveRelative(basePath, href.split('#')[0]);
+        onNavigate?.(target);
       }
     },
-    [onNavigate],
+    [onNavigate, basePath],
   );
 
   // Progressive, non-blocking syntax highlighting of fenced code blocks.
@@ -90,6 +107,37 @@ export function Reader({
     };
   }, [html, theme, isLargeFile]);
 
+  // Resolve relative <img> sources (e.g. `assets/powermaps/x.png`) to in-memory
+  // object URLs read from the opened folder. Runs after each render; revokes URLs
+  // on cleanup. Remote/absolute sources are left untouched.
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root || !basePath || !resolveAsset) return;
+    let cancelled = false;
+    const created: string[] = [];
+    const imgs = Array.from(root.querySelectorAll('img'));
+    (async () => {
+      for (const img of imgs) {
+        const src = img.getAttribute('src') ?? '';
+        if (!src || /^(https?:|data:|blob:)/i.test(src) || src.startsWith('#')) continue;
+        const path = resolveRelative(basePath, src);
+        const url = await resolveAsset(path);
+        if (cancelled) {
+          if (url) URL.revokeObjectURL(url);
+          return;
+        }
+        if (url) {
+          created.push(url);
+          img.setAttribute('src', url);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      for (const url of created) URL.revokeObjectURL(url);
+    };
+  }, [html, basePath, resolveAsset]);
+
   return (
     <article
       ref={containerRef}
@@ -112,4 +160,18 @@ export function Reader({
       />
     </article>
   );
+}
+
+/**
+ * Resolve a relative path (`href`) against the directory of `fromPath`. Both are
+ * root-relative with forward slashes; returns a root-relative path.
+ */
+function resolveRelative(fromPath: string, rel: string): string {
+  const stack = fromPath.split('/').slice(0, -1);
+  for (const part of rel.replace(/\\/g, '/').split('/')) {
+    if (part === '' || part === '.') continue;
+    if (part === '..') stack.pop();
+    else stack.push(part);
+  }
+  return stack.join('/');
 }

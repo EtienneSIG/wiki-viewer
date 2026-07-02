@@ -138,6 +138,33 @@ export async function clearFolders(): Promise<void> {
 }
 
 /**
+ * Read a nested file (binary) from a root directory handle by its
+ * root-relative path (forward slashes). Used to resolve assets referenced from
+ * Markdown (e.g. `assets/powermaps/foo.png`) into in-memory blobs. Nothing
+ * leaves the device (Principle III). Returns null if the path can't be read.
+ */
+export async function readFileAtPath(
+  root: FileSystemDirectoryHandle,
+  path: string,
+): Promise<File | null> {
+  const parts = path
+    .replace(/\\/g, '/')
+    .split('/')
+    .filter((p) => p && p !== '.');
+  if (parts.length === 0) return null;
+  try {
+    let dir = root;
+    for (let i = 0; i < parts.length - 1; i++) {
+      dir = await dir.getDirectoryHandle(parts[i]);
+    }
+    const fileHandle = await dir.getFileHandle(parts[parts.length - 1]);
+    return await fileHandle.getFile();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Write text back to a file handle (File System Access API). Re-requests
  * readwrite permission if needed (must be called from a user gesture). Nothing
  * leaves the device — the file is written in place (Principle III). Returns

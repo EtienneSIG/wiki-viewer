@@ -1294,3 +1294,69 @@ a:focus-visible,
   border-radius: 999px;
   pointer-events: none;
 }
+
+/* Excalidraw diagram view */
+.wv-excalidraw {
+  position: relative;
+  width: 100%;
+  height: calc(100vh - 8rem);
+  min-height: 24rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--surface);
+}
+.wv-excalidraw-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+.wv-excalidraw-canvas:active {
+  cursor: grabbing;
+}
+.wv-excalidraw-toolbar {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 2;
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.3rem;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(6px);
+}
+.wv-excalidraw-toolbar button {
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.wv-excalidraw-toolbar button:hover {
+  background: var(--surface-hover);
+}
+.wv-excalidraw-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  height: 12rem;
+}
+
+/* Excalidraw badge in the file tree */
+.markdit-tree-badge {
+  display: inline-block;
+  margin-right: 0.3rem;
+  color: var(--accent-text);
+}
+.markdit-tree-excalidraw {
+  font-style: italic;
+}
