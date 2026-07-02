@@ -5,6 +5,24 @@ le dossier [`memory/`](../memory) mais fonctionne avec n'importe quel dossier de
 notes `.md`. Inspirée d'[Obsidian](https://obsidian.md) (vue graphe + backlinks)
 et bâtie sur le moteur de rendu/édition de [**Markdit**](https://github.com/EtienneSIG/Markdit).
 
+## Aperçu
+
+### Lecture — rendu Markdown, `[[wikilinks]]` et arborescence
+
+![Vue lecture de Wiki Viewer (thème clair)](docs/screenshots/reader-light.png)
+
+### Graphe façon Obsidian — nœuds colorés par catégorie, légende et filtres
+
+![Vue graphe de Wiki Viewer](docs/screenshots/graph-light.png)
+
+### Recherche plein-texte — `Ctrl/Cmd + K`
+
+![Palette de recherche de Wiki Viewer](docs/screenshots/search-light.png)
+
+### Thème sombre
+
+![Vue lecture de Wiki Viewer (thème sombre)](docs/screenshots/reader-dark.png)
+
 ## Fonctionnalités
 
 - **Ouvrir un wiki** — un bouton, un sélecteur de dossier (File System Access API),
@@ -22,6 +40,9 @@ et bâtie sur le moteur de rendu/édition de [**Markdit**](https://github.com/Et
   cliquables dans le lecteur ; les cibles inexistantes sont signalées visuellement.
 - **Backlinks** — panneau latéral listant les pages qui pointent vers la page
   courante, plus ses liens sortants.
+- **Recherche plein-texte** — palette de recherche (bouton loupe ou `Ctrl/Cmd + K`)
+  qui parcourt titres et contenu de toutes les pages, avec extraits surlignés,
+  classement par pertinence et navigation au clavier (↑/↓, Entrée, Échap).
 - **Thèmes** — système / clair / sombre / contraste élevé.
 - **Multilingue** — interface en **français** et **anglais** ; bascule via le bouton
   langue de la barre d'outils. La langue est détectée depuis le navigateur au premier

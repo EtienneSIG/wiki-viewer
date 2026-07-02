@@ -6,6 +6,7 @@ import { FileTree } from '../components/sidebar/FileTree';
 import { Backlinks } from '../components/backlinks/Backlinks';
 import { GraphView } from '../components/graph/GraphView';
 import { StatusBar } from '../components/statusbar/StatusBar';
+import { SearchPanel } from '../components/search/SearchPanel';
 import { scanEntries, buildLightModel, readEntries, buildModel, type WikiModel } from '../lib/wiki';
 import { buildContactsGraph } from '../lib/contacts';
 import { splitFrontmatter, joinFrontmatter } from '../lib/frontmatter';
@@ -50,6 +51,7 @@ export function App(): JSX.Element {
   const [view, setView] = useState<ViewMode>('read');
   const [theme, setTheme] = useState<ThemeId>('system');
   const [locale, setLocaleState] = useState<Locale>(() => getLocale());
+  const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [indexing, setIndexing] = useState(false);
@@ -250,8 +252,7 @@ export function App(): JSX.Element {
         e.preventDefault();
         void handleSave();
       }
-    };
-    window.addEventListener('keydown', onKeyDown);
+    };    window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [handleSave]);
 
@@ -286,6 +287,18 @@ export function App(): JSX.Element {
   const toggleLocale = useCallback(() => {
     setLocaleState((cur) => setLocale(cur === 'fr' ? 'en' : 'fr'));
   }, []);
+
+  // Ctrl/Cmd+K opens the full-text search palette (only with a wiki open).
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (model) setSearchOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [model]);
 
   const fileLabel = activeFile?.name ?? '—';
 
@@ -348,6 +361,14 @@ export function App(): JSX.Element {
         )}
 
         <nav className="markdit-topbar-right markdit-actions" aria-label="Actions">
+          {model && (
+            <button type="button" onClick={() => setSearchOpen(true)} title={`${t('search.open')} (Ctrl/Cmd+K)`} aria-label={t('search.open')}>
+              <svg className="markdit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+            </button>
+          )}
           <button type="button" onClick={toggleLocale} title={t('lang.toggle')} aria-label={t('lang.toggle')}>
             <svg className="markdit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="9" />
@@ -511,6 +532,9 @@ export function App(): JSX.Element {
           )}
         </main>
       </div>
+      {model && searchOpen && (
+        <SearchPanel model={model} onNavigate={openPath} onClose={() => setSearchOpen(false)} />
+      )}
       <StatusBar />
     </div>
   );
