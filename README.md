@@ -5,6 +5,11 @@ A web interface to view, browse and edit a Markdown wiki — designed for the
 by [Obsidian](https://obsidian.md) (graph view + backlinks) and built on the
 rendering/editing engine of [**Markdit**](https://github.com/EtienneSIG/Markdit).
 
+## Download
+
+Grab the latest Windows and macOS builds from the
+**[releases page](https://github.com/EtienneSIG/wiki-viewer/releases/latest)**.
+
 ## Overview
 
 ### Reading — Markdown rendering, `[[wikilinks]]` and file tree
