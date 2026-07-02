@@ -1,61 +1,61 @@
 # Wiki Viewer
 
-Interface web pour visualiser, parcourir et éditer un wiki Markdown — pensée pour
-le dossier [`memory/`](../memory) mais fonctionne avec n'importe quel dossier de
-notes `.md`. Inspirée d'[Obsidian](https://obsidian.md) (vue graphe + backlinks)
-et bâtie sur le moteur de rendu/édition de [**Markdit**](https://github.com/EtienneSIG/Markdit).
+A web interface to view, browse and edit a Markdown wiki — designed for the
+[`memory/`](../memory) folder but works with any folder of `.md` notes. Inspired
+by [Obsidian](https://obsidian.md) (graph view + backlinks) and built on the
+rendering/editing engine of [**Markdit**](https://github.com/EtienneSIG/Markdit).
 
-## Aperçu
+## Overview
 
-### Lecture — rendu Markdown, `[[wikilinks]]` et arborescence
+### Reading — Markdown rendering, `[[wikilinks]]` and file tree
 
-![Vue lecture de Wiki Viewer (thème clair)](docs/screenshots/reader-light.png)
+![Wiki Viewer reading view (light theme)](docs/screenshots/reader-light.png)
 
-### Graphe façon Obsidian — nœuds colorés par catégorie, légende et filtres
+### Obsidian-style graph — nodes colored by category, legend and filters
 
-![Vue graphe de Wiki Viewer](docs/screenshots/graph-light.png)
+![Wiki Viewer graph view](docs/screenshots/graph-light.png)
 
-### Recherche plein-texte — `Ctrl/Cmd + K`
+### Full-text search — `Ctrl/Cmd + K`
 
-![Palette de recherche de Wiki Viewer](docs/screenshots/search-light.png)
+![Wiki Viewer search palette](docs/screenshots/search-light.png)
 
-### Thème sombre
+### Dark theme
 
-![Vue lecture de Wiki Viewer (thème sombre)](docs/screenshots/reader-dark.png)
+![Wiki Viewer reading view (dark theme)](docs/screenshots/reader-dark.png)
 
-## Fonctionnalités
+## Features
 
-- **Ouvrir un wiki** — un bouton, un sélecteur de dossier (File System Access API),
-  et tout le dossier est chargé. Le dernier dossier ouvert est ré-ouvert au démarrage.
-- **Arborescence** — navigation par dossiers/fichiers repliable, façon Markdit.
-- **Lecture** — rendu Markdown (remark/rehype) sécurisé, avec coloration syntaxique
-  Shiki, exactement comme dans Markdit.
-- **Édition** — éditeur WYSIWYG TipTap ; le Markdown reste la source de vérité
-  (aucun format propriétaire). `Ctrl/Cmd + S` pour enregistrer sur le disque.
-- **Graphe façon Obsidian** — graphe de force (canvas) : nœuds = pages,
-  arêtes = `[[liens]]`. Zoom molette, déplacement, glisser un nœud, survol pour
-  isoler les voisins, recherche, masquer les orphelins, étiquettes, légende par
-  catégorie. Clic sur un nœud → ouvre la page.
-- **`[[wikilinks]]`** — les liens `[[cible]]` et `[[cible|alias]]` deviennent
-  cliquables dans le lecteur ; les cibles inexistantes sont signalées visuellement.
-- **Backlinks** — panneau latéral listant les pages qui pointent vers la page
-  courante, plus ses liens sortants.
-- **Recherche plein-texte** — palette de recherche (bouton loupe ou `Ctrl/Cmd + K`)
-  qui parcourt titres et contenu de toutes les pages, avec extraits surlignés,
-  classement par pertinence et navigation au clavier (↑/↓, Entrée, Échap).
-- **Thèmes** — système / clair / sombre / contraste élevé.
-- **Multilingue** — interface en **français** et **anglais** ; bascule via le bouton
-  langue de la barre d'outils. La langue est détectée depuis le navigateur au premier
-  lancement puis mémorisée.
+- **Open a wiki** — one button, a folder picker (File System Access API), and the
+  whole folder is loaded. The last opened folder is reopened on startup.
+- **File tree** — collapsible folder/file navigation, Markdit-style.
+- **Reading** — safe Markdown rendering (remark/rehype) with Shiki syntax
+  highlighting, exactly like in Markdit.
+- **Editing** — TipTap WYSIWYG editor; Markdown stays the source of truth (no
+  proprietary format). `Ctrl/Cmd + S` saves to disk.
+- **Obsidian-style graph** — force-directed graph (canvas): nodes = pages,
+  edges = `[[links]]`. Wheel zoom, panning, node dragging, hover to isolate
+  neighbors, search, hide orphans, labels, per-category legend. Click a node to
+  open the page.
+- **`[[wikilinks]]`** — `[[target]]` and `[[target|alias]]` links become
+  clickable in the reader; missing targets are flagged visually.
+- **Backlinks** — side panel listing the pages that point to the current page,
+  plus its outgoing links.
+- **Full-text search** — search palette (magnifier button or `Ctrl/Cmd + K`) that
+  scans titles and content of every page, with highlighted excerpts, relevance
+  ranking and keyboard navigation (↑/↓, Enter, Esc).
+- **Themes** — system / light / dark / high contrast.
+- **Multilingual** — interface in **English** and **French**; toggle via the
+  language button in the toolbar. The language is detected from the browser on
+  first launch, then remembered.
 
-## Prérequis
+## Requirements
 
-- **Node.js** 18+ (pour le serveur de dev / le build).
-- Un navigateur **Chromium** (Edge, Chrome…) : l'ouverture de dossier repose sur
-  la [File System Access API](https://developer.mozilla.org/docs/Web/API/File_System_Access_API),
-  non disponible dans Firefox/Safari.
+- **Node.js** 18+ (for the dev server / build).
+- A **Chromium** browser (Edge, Chrome…): opening a folder relies on the
+  [File System Access API](https://developer.mozilla.org/docs/Web/API/File_System_Access_API),
+  which is not available in Firefox/Safari.
 
-## Démarrage
+## Getting started
 
 ```bash
 cd wiki-viewer
@@ -63,79 +63,78 @@ npm install
 npm run dev
 ```
 
-Puis ouvrez http://localhost:1421, cliquez **Ouvrir un wiki** et sélectionnez le
-dossier `memory` (ou tout autre dossier de notes Markdown). Autorisez l'accès en
-lecture/écriture pour pouvoir enregistrer vos modifications.
+Then open http://localhost:1421, click **Open a wiki** and select the `memory`
+folder (or any other folder of Markdown notes). Grant read/write access so you
+can save your changes.
 
-## Build de production
-
-```bash
-npm run build      # vérifie les types (tsc) puis génère dist/
-npm run preview    # sert le build de production
-```
-
-## Applications desktop (Windows & macOS)
-
-L'application est empaquetée avec [Electron](https://www.electronjs.org/) via
-[electron-builder]. Le rendu reste le même code web ; l'API File System Access et
-IndexedDB fonctionnent dans le runtime Chromium d'Electron.
+## Production build
 
 ```bash
-npm run electron:dev     # lance l'app Electron sur le serveur de dev Vite
-npm run release:win      # génère un installateur Windows (NSIS) dans release/
-npm run release:mac      # génère un .dmg (x64 + arm64) — nécessite macOS
-npm run release:all      # les deux (chaque cible sur son OS natif)
+npm run build      # type-check (tsc) then build dist/
+npm run preview    # serve the production build
 ```
 
-Les artefacts sont produits dans le dossier `release/`.
+## Desktop apps (Windows & macOS)
 
-### Générer les deux plateformes automatiquement
+The app is packaged with [Electron](https://www.electronjs.org/) via
+[electron-builder]. The renderer is the same web code; the File System Access API
+and IndexedDB work in Electron's Chromium runtime.
 
-macOS ne peut pas être compilé depuis Windows (ni l'inverse pour la signature).
-Le workflow [`.github/workflows/release.yml`](.github/workflows/release.yml)
-construit **Windows + macOS** sur des runners natifs et publie une GitHub Release :
+```bash
+npm run electron:dev     # run the Electron app against the Vite dev server
+npm run release:win      # build a Windows installer (NSIS) into release/
+npm run release:mac      # build a .dmg (x64 + arm64) — requires macOS
+npm run release:all      # both (each target on its native OS)
+```
+
+Artifacts are produced in the `release/` folder.
+
+### Build both platforms automatically
+
+macOS cannot be built from Windows (nor the reverse for signing). The
+[`.github/workflows/release.yml`](.github/workflows/release.yml) workflow builds
+**Windows + macOS** on native runners and publishes a GitHub Release:
 
 ```bash
 git tag v0.1.0
-git push origin v0.1.0   # déclenche le build multi-plateforme + la release
+git push origin v0.1.0   # triggers the cross-platform build + release
 ```
 
-(Ou déclenchement manuel via l'onglet *Actions* → *Release* → *Run workflow*.)
+(Or trigger it manually via the *Actions* tab → *Release* → *Run workflow*.)
 
-### Build Windows local
+### Local Windows build
 
-- `npm run release:win` produit un **installateur NSIS**. La création de
-  l'installateur signé requiert l'extraction de `winCodeSign`, qui a besoin du
-  **Mode développeur Windows** activé (ou d'un terminal *Administrateur*) pour créer
-  des liens symboliques.
-- Sans ces droits, utilisez `npx electron-builder --win --dir` : cela génère une
-  application décompressée fonctionnelle dans `release/win-unpacked/`
-  (`Wiki Viewer.exe`), sans installateur ni signature.
+- `npm run release:win` produces an **NSIS installer**. Creating the signed
+  installer requires extracting `winCodeSign`, which needs **Windows Developer
+  Mode** enabled (or an *Administrator* terminal) to create symbolic links.
+- Without those rights, use `npx electron-builder --win --dir`: it produces a
+  working unpacked app in `release/win-unpacked/` (`Wiki Viewer.exe`), with no
+  installer or signing.
 
 [electron-builder]: https://www.electron.build/
 
-## Notes techniques
+## Technical notes
 
-- **Réutilise Markdit tel quel** pour le pipeline Markdown
-  (`src/markdown/*`) et les composants lecteur/éditeur/barre d'outils. Le rendu et
-  l'édition sont donc identiques à Markdit.
-- **Modèle wiki** (`src/lib/wiki.ts`) : scanne le dossier, résout les `[[liens]]`
-  (par slug, titre ou chemin), construit l'arborescence, le graphe et les backlinks.
-  `buildModel()` est pur (sans API navigateur) et recalculé après chaque
-  enregistrement pour rafraîchir graphe/backlinks.
-- **`[[wikilinks]]`** (`src/markdown/remark-wikilink.ts`) : transformation
-  mdast→mdast appliquée **uniquement au rendu**, jamais au parse partagé de
-  l'éditeur — le Markdown `[[...]]` est donc préservé à l'octet près à la sauvegarde.
-- **Frontmatter** (`src/lib/frontmatter.ts`) : le bloc YAML est détaché pour la
-  lecture/édition puis ré-attaché verbatim à l'enregistrement (pas d'aller-retour
-  YAML destructif).
-- **Persistance** : seuls des handles opaques de dossier sont stockés dans
-  IndexedDB ; rien ne quitte l'appareil.
-- Le port de dev est **1421** (Markdit utilise 1420).
+- **Reuses Markdit as-is** for the Markdown pipeline (`src/markdown/*`) and the
+  reader/editor/toolbar components. Rendering and editing are therefore identical
+  to Markdit.
+- **Wiki model** (`src/lib/wiki.ts`): scans the folder, resolves `[[links]]` (by
+  slug, title or path), builds the file tree, the graph and the backlinks.
+  `buildModel()` is pure (no browser API) and recomputed after each save to
+  refresh the graph/backlinks.
+- **`[[wikilinks]]`** (`src/markdown/remark-wikilink.ts`): an mdast→mdast
+  transform applied **only when rendering**, never to the editor's shared parse
+  — so `[[...]]` Markdown is preserved byte-for-byte on save.
+- **Frontmatter** (`src/lib/frontmatter.ts`): the YAML block is detached for
+  reading/editing then re-attached verbatim on save (no destructive YAML
+  round-trip).
+- **Persistence**: only opaque folder handles are stored in IndexedDB; nothing
+  leaves the device.
+- The dev port is **1421** (Markdit uses 1420).
 
-## Licence
+## License
 
-Distribué sous licence [MIT](LICENSE). © 2026 EtienneSIG.
+Distributed under the [MIT](LICENSE) license. © 2026 EtienneSIG.
 
 ## Structure
 
@@ -143,14 +142,16 @@ Distribué sous licence [MIT](LICENSE). © 2026 EtienneSIG.
 src/
 ├── app/            App.tsx (shell), theme.ts
 ├── components/
-│   ├── reader/     Reader.tsx        (Markdit + navigation [[liens]])
+│   ├── reader/     Reader.tsx        (Markdit + [[link]] navigation)
 │   ├── editor/     Editor.tsx        (Markdit, TipTap)
 │   ├── toolbar/    Toolbar.tsx, actions.ts (Markdit)
-│   ├── sidebar/    FileTree.tsx      (arborescence)
-│   ├── backlinks/  Backlinks.tsx     (backlinks + liens sortants)
-│   └── graph/      GraphView.tsx     (graphe force-directed, canvas)
-├── lib/            wiki.ts, frontmatter.ts, folder-handle.ts, i18n.ts, types.ts
+│   ├── sidebar/    FileTree.tsx      (file tree)
+│   ├── backlinks/  Backlinks.tsx     (backlinks + outgoing links)
+│   ├── search/     SearchPanel.tsx   (full-text search palette)
+│   └── graph/      GraphView.tsx     (force-directed graph, canvas)
+├── lib/            wiki.ts, search.ts, frontmatter.ts, folder-handle.ts, i18n.ts,
+│                   version.ts, types.ts
 ├── markdown/       parse, render, sanitize, serialize, highlight, tiptap-bridge,
 │                   remark-wikilink
-└── styles.css      (Markdit + additions .wv-*)
+└── styles.css      (Markdit + .wv-* additions)
 ```
