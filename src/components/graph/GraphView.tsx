@@ -106,6 +106,8 @@ export function GraphView({ graph, activePath, onOpen, theme }: GraphViewProps):
   const [showOrphans, setShowOrphans] = useState(true);
   const [showLabels, setShowLabels] = useState(false);
   const [clientFilter, setClientFilter] = useState('');
+  const [spacing, setSpacing] = useState(1.4);
+  const spacingRef = useRef(1.4);
   const [legend, setLegend] = useState<{ group: string; color: string }[]>([]);
 
   // All client slugs present in the graph, for the "filtre par client" dropdown.
@@ -128,6 +130,18 @@ export function GraphView({ graph, activePath, onOpen, theme }: GraphViewProps):
     themeRef.current = theme;
     drawRef.current();
   }, [theme]);
+  // Live spacing control: retune forces in place and re-heat the layout.
+  useEffect(() => {
+    spacingRef.current = spacing;
+    const sim = simRef.current;
+    if (!sim) return;
+    const link = sim.force('link') as { distance?: (v: number) => unknown } | undefined;
+    link?.distance?.(90 * spacing);
+    const charge = sim.force('charge') as { strength?: (v: number) => unknown } | undefined;
+    charge?.strength?.(-260 * spacing);
+    sim.force('collide', forceCollide<GNode>((d) => radiusOf(d) + 10 * spacing));
+    sim.alpha(0.7).restart();
+  }, [spacing]);
   useEffect(() => {
     activeRef.current = activePath;
     focusActive();
@@ -192,17 +206,18 @@ export function GraphView({ graph, activePath, onOpen, theme }: GraphViewProps):
     setLegend([...colors].map(([group, color]) => ({ group, color })));
 
     const { w, h } = dimsRef.current;
+    const s = spacingRef.current;
     const sim = forceSimulation<GNode>(nodes)
       .force(
         'link',
         forceLink<GNode, GLink>(links)
           .id((d) => d.id)
-          .distance(60)
-          .strength(0.6),
+          .distance(90 * s)
+          .strength(0.35),
       )
-      .force('charge', forceManyBody<GNode>().strength(-160))
+      .force('charge', forceManyBody<GNode>().strength(-260 * s).distanceMax(600))
       .force('center', forceCenter(w / 2, h / 2))
-      .force('collide', forceCollide<GNode>((d) => radiusOf(d) + 4))
+      .force('collide', forceCollide<GNode>((d) => radiusOf(d) + 10 * s))
       .on('tick', () => drawRef.current());
     simRef.current = sim;
 
@@ -475,7 +490,7 @@ export function GraphView({ graph, activePath, onOpen, theme }: GraphViewProps):
     const { w, h } = dimsRef.current;
     const cx = w / 2;
     const cy = h / 2;
-    const radius = Math.max(120, Math.min(w, h) * 0.42);
+    const radius = Math.max(120, Math.min(w, h) * 0.42) * spacingRef.current;
     nodes.forEach((n, i) => {
       // Golden-angle spiral gives an even, non-overlapping initial spread.
       const a = i * 2.399963229728653;
@@ -523,6 +538,18 @@ export function GraphView({ graph, activePath, onOpen, theme }: GraphViewProps):
             onChange={(e) => setShowLabels(e.target.checked)}
           />
           Étiquettes
+        </label>
+        <label className="wv-graph-slider">
+          <span>Espacement</span>
+          <input
+            type="range"
+            min={0.8}
+            max={3}
+            step={0.1}
+            value={spacing}
+            onChange={(e) => setSpacing(Number(e.target.value))}
+            aria-label="Espacement entre les nœuds"
+          />
         </label>
         {clientOptions.length > 0 && (
           <select

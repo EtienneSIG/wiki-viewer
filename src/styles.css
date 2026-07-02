@@ -1207,6 +1207,18 @@ a:focus-visible,
 .wv-graph-reset:hover {
   background: var(--surface-hover);
 }
+.wv-graph-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--fg);
+}
+.wv-graph-slider input[type='range'] {
+  width: 100%;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
 .wv-graph-select {
   width: 100%;
   padding: 0.4rem 0.6rem;
