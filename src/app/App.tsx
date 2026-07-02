@@ -4,7 +4,7 @@ import { Editor } from '../components/editor/Editor';
 import { FileTree } from '../components/sidebar/FileTree';
 import { Backlinks } from '../components/backlinks/Backlinks';
 import { GraphView } from '../components/graph/GraphView';
-import { scanWiki, buildModel, type WikiModel } from '../lib/wiki';
+import { scanEntries, buildLightModel, readEntries, buildModel, type WikiModel } from '../lib/wiki';
 import { splitFrontmatter, joinFrontmatter } from '../lib/frontmatter';
 import { writeFileHandle, loadFolders, saveFolders } from '../lib/folder-handle';
 import { applyTheme } from './theme';
@@ -43,19 +43,30 @@ export function App(): JSX.Element {
   const [theme, setTheme] = useState<ThemeId>('system');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [indexing, setIndexing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
 
   const resolvedTheme = useMemo(() => resolveTheme(theme), [theme]);
   const activeFile = model && activePath ? model.byPath.get(activePath) ?? null : null;
 
-  // Load the frontmatter/body of a file within a given model.
-  const openFile = useCallback((m: WikiModel, path: string): void => {
+  // Load the frontmatter/body of a file within a given model. Content is read
+  // lazily from disk on first open (the model may only hold entry metadata).
+  const openFile = useCallback(async (m: WikiModel, path: string): Promise<void> => {
     const file = m.byPath.get(path);
     if (!file) return;
-    const { raw, body: content } = splitFrontmatter(file.content);
+    let content = file.content;
+    if (!content) {
+      try {
+        content = await (await file.handle.getFile()).text();
+        file.content = content; // cache on the model
+      } catch {
+        content = '';
+      }
+    }
+    const { raw, body: bodyText } = splitFrontmatter(content);
     setFrontmatterRaw(raw);
-    setBody(content);
+    setBody(bodyText);
     setActivePath(path);
     setDirty(false);
   }, []);
@@ -65,20 +76,29 @@ export function App(): JSX.Element {
       setLoading(true);
       setError(null);
       try {
-        const m = await scanWiki(dir);
-        setModel(m);
+        // Phase 1 (instant): enumerate files, show the tree, open the first page.
+        const { rootName, entries } = await scanEntries(dir);
+        const light = buildLightModel(rootName, entries);
+        setModel(light);
         setRootDir(dir);
         setReopenDir(null);
-        await saveFolders([dir]);
-        const initial = pickInitial(m);
+        void saveFolders([dir]);
+        const initial = pickInitial(light);
         if (initial) {
-          openFile(m, initial);
+          await openFile(light, initial);
           setView('read');
         }
+        setLoading(false);
+
+        // Phase 2 (background): read every file, compute graph + backlinks.
+        setIndexing(true);
+        const files = await readEntries(entries);
+        setModel(buildModel(rootName, files));
+        setIndexing(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
-      } finally {
         setLoading(false);
+        setIndexing(false);
       }
     },
     [openFile],
@@ -132,7 +152,7 @@ export function App(): JSX.Element {
     (path: string): void => {
       if (!model) return;
       if (dirty && !window.confirm('Modifications non enregistrées. Continuer ?')) return;
-      openFile(model, path);
+      void openFile(model, path);
       if (view === 'graph') setView('read');
     },
     [model, dirty, view, openFile],
@@ -286,7 +306,10 @@ export function App(): JSX.Element {
               </div>
             </div>
             <div className="markdit-sidebar-body">
-              <span className="wv-count wv-filecount">{model.files.length} pages</span>
+              <span className="wv-count wv-filecount">
+                {model.files.length} pages
+                {indexing && <span className="wv-indexing"> · indexation…</span>}
+              </span>
               <FileTree nodes={model.tree} activePath={activePath} onSelect={openPath} />
             </div>
           </aside>
@@ -296,7 +319,15 @@ export function App(): JSX.Element {
           {!model ? (
             <EmptyState onOpen={openWiki} reopenDir={reopenDir} onReopen={reopen} loading={loading} error={error} />
           ) : view === 'graph' ? (
-            <GraphView graph={model.graph} activePath={activePath} onOpen={openPath} theme={resolvedTheme} />
+            model.graph.links.length === 0 && indexing ? (
+              <div className="wv-empty">
+                <div className="wv-empty-card">
+                  <p className="wv-empty-text">Indexation du graphe en cours…</p>
+                </div>
+              </div>
+            ) : (
+              <GraphView graph={model.graph} activePath={activePath} onOpen={openPath} theme={resolvedTheme} />
+            )
           ) : (
             <div className="wv-doc">
               <div className="wv-doc-main">

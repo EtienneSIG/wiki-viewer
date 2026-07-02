@@ -947,6 +947,11 @@ a:focus-visible,
   background: var(--surface-2);
   border-radius: 999px;
 }
+.wv-indexing {
+  color: var(--muted);
+  font-style: italic;
+  opacity: 0.85;
+}
 
 /* Document + backlinks two-column layout */
 .wv-doc {

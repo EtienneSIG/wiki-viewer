@@ -89,22 +89,70 @@ async function collectFiles(
   }
 }
 
-/** Read a folder into a full wiki model. */
+/** Read a folder into a full wiki model (single blocking pass). */
 export async function scanWiki(dir: FileSystemDirectoryHandle): Promise<WikiModel> {
+  const { rootName, entries } = await scanEntries(dir);
+  const files = await readEntries(entries);
+  return buildModel(rootName, files);
+}
+
+/** A discovered Markdown file, before its content is read. */
+export interface WikiEntry {
+  handle: FileSystemFileHandle;
+  path: string;
+  name: string;
+}
+
+/**
+ * Phase 1 (fast): enumerate Markdown files WITHOUT reading their contents.
+ * This is cheap even on cloud-synced (OneDrive) folders because it never
+ * hydrates file bodies — only directory metadata is touched.
+ */
+export async function scanEntries(
+  dir: FileSystemDirectoryHandle,
+): Promise<{ rootName: string; entries: WikiEntry[] }> {
   const raw: RawFile[] = [];
   await collectFiles(dir, '', raw);
-  const files = await Promise.all(
-    raw.map(async (rf) => {
+  return { rootName: dir.name, entries: raw };
+}
+
+/**
+ * Build a lightweight model from entries alone (empty content). The file tree
+ * and the slug/title/path `[[wikilink]]` resolver work immediately; the graph
+ * and backlinks stay empty until {@link readEntries} + {@link buildModel} run.
+ */
+export function buildLightModel(rootName: string, entries: WikiEntry[]): WikiModel {
+  return buildModel(rootName, entries.map((e) => buildFile(e, '')));
+}
+
+/**
+ * Phase 2 (background): read entry contents with bounded concurrency to avoid
+ * thrashing cloud-synced folders. Returns full {@link WikiFile}s ready for
+ * {@link buildModel}.
+ */
+export async function readEntries(
+  entries: WikiEntry[],
+  concurrency = 12,
+): Promise<WikiFile[]> {
+  const files = new Array<WikiFile>(entries.length);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const i = next++;
+      if (i >= entries.length) return;
+      const e = entries[i];
       let content = '';
       try {
-        content = await (await rf.handle.getFile()).text();
+        content = await (await e.handle.getFile()).text();
       } catch {
         content = '';
       }
-      return buildFile(rf, content);
-    }),
-  );
-  return buildModel(dir.name, files);
+      files[i] = buildFile(e, content);
+    }
+  };
+  const workers = Math.max(1, Math.min(concurrency, entries.length));
+  await Promise.all(Array.from({ length: workers }, worker));
+  return files;
 }
 
 function buildFile(rf: RawFile, content: string): WikiFile {
