@@ -296,11 +296,22 @@ export function buildModel(rootName: string, files: WikiFile[]): WikiModel {
   }
 
   // Graph (undirected, deduped).
+  // Retrospective pages (raw 12-month WorkIQ snapshots + the FY26 retrospective
+  // query) are excluded from the graph — they are point-in-time digests that add
+  // clutter rather than structural links.
+  const isRetrospective = (f: WikiFile): boolean =>
+    /retrospective/i.test(f.slug) || f.tags.some((t) => t.toLowerCase() === 'retrospective');
+  const excludedPaths = new Set<string>(
+    files.filter(isRetrospective).map((f) => f.path),
+  );
+
   const degree = new Map<string, number>();
   const links: GraphLink[] = [];
   const seen = new Set<string>();
   for (const f of files) {
+    if (excludedPaths.has(f.path)) continue;
     for (const target of f.outLinks) {
+      if (excludedPaths.has(target)) continue;
       const key = `${f.path}\u0000${target}`;
       const rev = `${target}\u0000${f.path}`;
       if (seen.has(key) || seen.has(rev)) continue;
@@ -338,7 +349,7 @@ export function buildModel(rootName: string, files: WikiFile[]): WikiModel {
   // Graph nodes are Markdown pages only; excalidraw assets stay in the tree but
   // out of the graph to avoid isolated clutter.
   const nodes: GraphNode[] = files
-    .filter((f) => f.kind === 'markdown')
+    .filter((f) => f.kind === 'markdown' && !excludedPaths.has(f.path))
     .map((f) => ({
       id: f.path,
       label: f.title,
