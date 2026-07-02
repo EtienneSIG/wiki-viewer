@@ -97,15 +97,30 @@ async function collectFiles(
   base: string,
   acc: RawFile[],
 ): Promise<void> {
-  for await (const entry of dir.values()) {
-    if (entry.name.startsWith('.')) continue; // skip .obsidian, .git, …
-    if (entry.kind === 'directory' && IGNORED_DIRS.has(entry.name.toLowerCase())) continue;
-    const path = base ? `${base}/${entry.name}` : entry.name;
-    if (entry.kind === 'directory') {
-      await collectFiles(entry as FileSystemDirectoryHandle, path, acc);
-    } else if (MD_EXT.test(entry.name)) {
-      acc.push({ handle: entry as FileSystemFileHandle, path, name: entry.name });
+  let iterator: AsyncIterable<FileSystemHandle>;
+  try {
+    iterator = dir.values();
+  } catch (err) {
+    // A cloud-only (OneDrive Files On-Demand) directory can refuse enumeration.
+    // Don't let one bad folder abort the whole scan — skip it and continue.
+    console.warn(`[wiki] cannot enumerate "${base || dir.name}":`, err);
+    return;
+  }
+  try {
+    for await (const entry of iterator) {
+      if (entry.name.startsWith('.')) continue; // skip .obsidian, .git, …
+      if (entry.kind === 'directory' && IGNORED_DIRS.has(entry.name.toLowerCase())) continue;
+      const path = base ? `${base}/${entry.name}` : entry.name;
+      if (entry.kind === 'directory') {
+        await collectFiles(entry as FileSystemDirectoryHandle, path, acc);
+      } else if (MD_EXT.test(entry.name)) {
+        acc.push({ handle: entry as FileSystemFileHandle, path, name: entry.name });
+      }
     }
+  } catch (err) {
+    // Iteration failed partway (e.g. a placeholder hydration error). Keep
+    // whatever we already collected rather than throwing the whole scan away.
+    console.warn(`[wiki] enumeration of "${base || dir.name}" stopped early:`, err);
   }
 }
 

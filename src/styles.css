@@ -1089,6 +1089,15 @@ a:focus-visible,
   font-size: 0.85rem;
   margin: 0 0 1rem;
 }
+.wv-sidebar-error {
+  margin: 0.25rem 0.5rem 0.75rem;
+  padding: 0.4rem 0.55rem;
+  background: rgba(209, 52, 56, 0.08);
+  border: 1px solid rgba(209, 52, 56, 0.3);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  word-break: break-word;
+}
 .wv-empty-actions {
   display: flex;
   gap: 0.6rem;

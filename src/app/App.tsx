@@ -77,12 +77,21 @@ export function App(): JSX.Element {
       setError(null);
       try {
         // Phase 1 (instant): enumerate files, show the tree, open the first page.
+        const t0 = performance.now();
         const { rootName, entries } = await scanEntries(dir);
+        console.info(
+          `[wiki] enumerated ${entries.length} file(s) in "${rootName}" in ${Math.round(
+            performance.now() - t0,
+          )}ms`,
+        );
         const light = buildLightModel(rootName, entries);
         setModel(light);
         setRootDir(dir);
         setReopenDir(null);
         void saveFolders([dir]);
+        if (entries.length === 0) {
+          setError(`Aucun fichier Markdown trouvé dans « ${rootName} ».`);
+        }
         const initial = pickInitial(light);
         if (initial) {
           await openFile(light, initial);
@@ -91,11 +100,15 @@ export function App(): JSX.Element {
         setLoading(false);
 
         // Phase 2 (background): read every file, compute graph + backlinks.
-        setIndexing(true);
-        const files = await readEntries(entries);
-        setModel(buildModel(rootName, files));
-        setIndexing(false);
+        if (entries.length > 0) {
+          setIndexing(true);
+          const files = await readEntries(entries);
+          setModel(buildModel(rootName, files));
+          setIndexing(false);
+          console.info(`[wiki] indexed ${files.length} file(s) in ${Math.round(performance.now() - t0)}ms`);
+        }
       } catch (err) {
+        console.error('[wiki] open failed:', err);
         setError(err instanceof Error ? err.message : String(err));
         setLoading(false);
         setIndexing(false);
@@ -310,6 +323,10 @@ export function App(): JSX.Element {
                 {model.files.length} pages
                 {indexing && <span className="wv-indexing"> · indexation…</span>}
               </span>
+              {error && <p className="wv-empty-error wv-sidebar-error">{error}</p>}
+              {model.files.length === 0 && !error && (
+                <p className="markdit-sidebar-empty">Aucune page Markdown trouvée.</p>
+              )}
               <FileTree nodes={model.tree} activePath={activePath} onSelect={openPath} />
             </div>
           </aside>
