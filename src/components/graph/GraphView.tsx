@@ -39,6 +39,21 @@ const PALETTE = [
   '#c239b3', '#0078d4', '#c19c00', '#e3008c', '#00b7c3', '#7a7574',
 ];
 
+/**
+ * Slugs (filename without extension) that are meaningful pages but too noisy
+ * as graph nodes — meta/hub pages that link to everything. Hidden from the
+ * graph only; they stay in the tree and remain valid [[wikilink]] targets.
+ */
+const GRAPH_EXCLUDED_SLUGS = new Set(['karpathy-llm-wiki']);
+
+/** True for meta pages that should not appear as graph nodes. */
+function isHiddenFromGraph(path: string): boolean {
+  const base = (path.split('/').pop() ?? path).toLowerCase();
+  if (base.startsWith('_')) return true; // _index and other stub pages
+  const slug = base.replace(/\.(md|markdown|mdown|mkd)$/i, '');
+  return GRAPH_EXCLUDED_SLUGS.has(slug);
+}
+
 function paletteFor(groups: string[]): Map<string, string> {
   const uniq = [...new Set(groups)].sort((a, b) => a.localeCompare(b));
   const map = new Map<string, string>();
@@ -167,12 +182,8 @@ export function GraphView({ graph, activePath, onOpen, theme }: GraphViewProps):
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const isUnderscore = (path: string): boolean => {
-      const base = path.split('/').pop() ?? path;
-      return base.startsWith('_');
-    };
     const nodes: GNode[] = graph.nodes
-      .filter((n) => !isUnderscore(n.id))
+      .filter((n) => !isHiddenFromGraph(n.id))
       .filter((n) => showOrphans || n.degree > 0)
       .map((n) => ({ id: n.id, label: n.label, group: n.group, degree: n.degree, clients: n.clients }));
 
