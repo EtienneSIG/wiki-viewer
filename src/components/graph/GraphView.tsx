@@ -167,7 +167,12 @@ export function GraphView({ graph, activePath, onOpen, theme }: GraphViewProps):
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const isUnderscore = (path: string): boolean => {
+      const base = path.split('/').pop() ?? path;
+      return base.startsWith('_');
+    };
     const nodes: GNode[] = graph.nodes
+      .filter((n) => !isUnderscore(n.id))
       .filter((n) => showOrphans || n.degree > 0)
       .map((n) => ({ id: n.id, label: n.label, group: n.group, degree: n.degree, clients: n.clients }));
 
