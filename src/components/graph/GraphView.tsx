@@ -231,7 +231,6 @@ export function GraphView({ graph, activePath, onOpen, theme }: GraphViewProps):
     if (!ctx) return;
 
     drawRef.current = (): void => {
-      const { w, h } = dimsRef.current;
       const dpr = dprRef.current;
       const { x: tx, y: ty, k } = transformRef.current;
       const nodes = nodesRef.current;

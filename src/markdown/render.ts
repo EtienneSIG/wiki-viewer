@@ -52,11 +52,13 @@ function gateRemoteContent(node: HastRoot | ElementContent): void {
 export function renderHtml(tree: Root, opts: RenderOptions = {}): string {
   const allowRemoteContent = opts.allowRemoteContent ?? false;
 
-  let processor = unified();
+  // `[[wikilinks]]` are an mdast→mdast rewrite; apply it directly to the tree so
+  // the (typed) hast pipeline below is byte-for-byte the shared render pipeline.
   if (opts.wikiResolve) {
-    processor = processor.use(remarkWikiLink, { resolve: opts.wikiResolve });
+    remarkWikiLink({ resolve: opts.wikiResolve })(tree);
   }
-  processor = processor
+
+  const processor = unified()
     .use(remarkRehype, { allowDangerousHtml: false })
     .use(rehypeSanitize, sanitizeSchema)
     .use(rehypeStringify);
