@@ -305,7 +305,7 @@ export function App(): JSX.Element {
               <div className="markdit-sidebar-header-actions">
                 <button
                   type="button"
-                  className="markdit-icon-button"
+                  className="markdit-icon-button wv-refresh-button"
                   onClick={refresh}
                   disabled={loading}
                   title={t('sidebar.refresh')}
@@ -315,6 +315,7 @@ export function App(): JSX.Element {
                     <path d="M21 12a9 9 0 1 1-2.64-6.36" />
                     <path d="M21 3v6h-6" />
                   </svg>
+                  <span className="wv-refresh-label">{t('sidebar.refreshShort')}</span>
                 </button>
               </div>
             </div>

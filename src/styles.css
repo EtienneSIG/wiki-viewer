@@ -390,6 +390,26 @@ a:focus-visible,
   opacity: 0.7;
 }
 
+/* Refresh action: icon + visible label so it reads as an actionable button. */
+.markdit-sidebar-header .wv-refresh-button {
+  gap: 0.35rem;
+  padding: 0.22rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--accent-text);
+}
+
+.markdit-sidebar-header .wv-refresh-button:hover:not(:disabled) {
+  color: var(--accent-text);
+  background: var(--surface-hover);
+}
+
+.wv-refresh-label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
 .markdit-icon.is-spinning {
   animation: markdit-spin 0.8s linear infinite;
 }
