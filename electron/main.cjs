@@ -8,6 +8,9 @@ const path = require('node:path');
 const isDev = !app.isPackaged;
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL || 'http://localhost:1421';
 
+/** Window/taskbar icon (the "W" brand mark). */
+const APP_ICON = path.join(__dirname, '..', 'build', 'icon.ico');
+
 /** @type {BrowserWindow | null} */
 let mainWindow = null;
 
@@ -19,6 +22,7 @@ function createWindow() {
     minHeight: 480,
     backgroundColor: '#1e1e1e',
     autoHideMenuBar: true,
+    icon: APP_ICON,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,

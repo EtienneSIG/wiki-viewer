@@ -6,28 +6,35 @@
  * emits `language-*` class hooks on code blocks; this module upgrades them to
  * fully tokenized markup when called by the client.
  */
-import type { Highlighter } from 'shiki';
+import type { HighlighterCore } from 'shiki/core';
 
-let highlighterPromise: Promise<Highlighter> | null = null;
+let highlighterPromise: Promise<HighlighterCore> | null = null;
 
-const DEFAULT_LANGS = [
-  'javascript',
-  'typescript',
-  'json',
-  'bash',
-  'python',
-  'rust',
-  'markdown',
-  'html',
-  'css',
-];
-
-async function getHighlighter(): Promise<Highlighter> {
+async function getHighlighter(): Promise<HighlighterCore> {
   if (!highlighterPromise) {
-    const { createHighlighter } = await import('shiki');
-    highlighterPromise = createHighlighter({
-      themes: ['github-light', 'github-dark'],
-      langs: DEFAULT_LANGS,
+    const [{ createHighlighterCore }, { createOnigurumaEngine }] = await Promise.all([
+      import('shiki/core'),
+      import('shiki/engine/oniguruma'),
+    ]);
+    // Fine-grained bundle: only the themes and languages actually used are
+    // pulled into the build, instead of Shiki's full ~270-language registry.
+    highlighterPromise = createHighlighterCore({
+      themes: [
+        import('shiki/themes/github-light.mjs'),
+        import('shiki/themes/github-dark.mjs'),
+      ],
+      langs: [
+        import('shiki/langs/javascript.mjs'),
+        import('shiki/langs/typescript.mjs'),
+        import('shiki/langs/json.mjs'),
+        import('shiki/langs/bash.mjs'),
+        import('shiki/langs/python.mjs'),
+        import('shiki/langs/rust.mjs'),
+        import('shiki/langs/markdown.mjs'),
+        import('shiki/langs/html.mjs'),
+        import('shiki/langs/css.mjs'),
+      ],
+      engine: createOnigurumaEngine(import('shiki/wasm')),
     });
   }
   return highlighterPromise;
