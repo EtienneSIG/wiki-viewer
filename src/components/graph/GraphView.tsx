@@ -30,7 +30,7 @@ interface GNode extends SimulationNodeDatum {
   clients: string[];
   title?: string;
 }
-type GLink = SimulationLinkDatum<GNode>;
+type GLink = SimulationLinkDatum<GNode> & { kind?: 'member' | 'influence' };
 
 interface Transform {
   x: number;
@@ -75,6 +75,8 @@ interface Palettes {
   link: string;
   linkStrong: string;
   bg: string;
+  influence: string;
+  influenceStrong: string;
 }
 
 function themeColors(theme: ThemeId): Palettes {
@@ -86,6 +88,8 @@ function themeColors(theme: ThemeId): Palettes {
         link: 'rgba(160,160,170,0.22)',
         linkStrong: 'rgba(210,210,220,0.75)',
         bg: '#1b1b1b',
+        influence: 'rgba(232,115,12,0.4)',
+        influenceStrong: 'rgba(255,150,60,0.95)',
       }
     : {
         fg: '#333333',
@@ -93,6 +97,8 @@ function themeColors(theme: ThemeId): Palettes {
         link: 'rgba(90,90,110,0.18)',
         linkStrong: 'rgba(70,70,90,0.65)',
         bg: '#ffffff',
+        influence: 'rgba(200,90,0,0.4)',
+        influenceStrong: 'rgba(200,90,0,0.9)',
       };
 }
 
@@ -208,7 +214,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder 
     const present = new Set(nodes.map((n) => n.id));
     const links: GLink[] = graph.links
       .filter((l) => present.has(l.source) && present.has(l.target))
-      .map((l) => ({ source: l.source, target: l.target }));
+      .map((l) => ({ source: l.source, target: l.target, kind: l.kind }));
 
     const nodeById = new Map(nodes.map((n) => [n.id, n]));
     const adj = new Map<string, Set<string>>();
@@ -318,12 +324,23 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder 
         if (s.x == null || t.x == null) continue;
         const touchesFocus =
           focusId != null && (s.id === focusId || t.id === focusId);
-        ctx.strokeStyle = touchesFocus ? c.linkStrong : c.link;
+        const influence = l.kind === 'influence';
+        if (influence) {
+          // Influence edges: accented + dashed so they stand out from spokes.
+          ctx.lineWidth = (touchesFocus ? 2 : 1.4) / k;
+          ctx.strokeStyle = touchesFocus ? c.influenceStrong : c.influence;
+          ctx.setLineDash([5 / k, 4 / k]);
+        } else {
+          ctx.lineWidth = 1 / k;
+          ctx.strokeStyle = touchesFocus ? c.linkStrong : c.link;
+          ctx.setLineDash([]);
+        }
         ctx.beginPath();
         ctx.moveTo(s.x, s.y!);
         ctx.lineTo(t.x, t.y!);
         ctx.stroke();
       }
+      ctx.setLineDash([]);
 
       // Nodes.
       for (const n of nodes) {

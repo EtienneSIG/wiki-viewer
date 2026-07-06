@@ -68,6 +68,12 @@ export interface GraphNode {
 export interface GraphLink {
   source: string;
   target: string;
+  /**
+   * `member` = structural spoke (contact → account hub); `influence` = an
+   * inferred influence/collaboration edge between two contacts. Absent means
+   * a plain wiki page link. Lets the graph render influence edges distinctly.
+   */
+  kind?: 'member' | 'influence';
 }
 
 export interface WikiGraph {

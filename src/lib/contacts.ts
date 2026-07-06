@@ -22,6 +22,9 @@ export interface ContactsGraphResult {
 /** Slug of the canonical contacts directory page. */
 const CONTACTS_SLUG = 'customer-contacts-directory';
 
+/** Slug of the hierarchy/influence map page (contact-to-contact edges). */
+const INFLUENCE_SLUG = 'contact-influence-map';
+
 /** Section headings that are not account tables. */
 const NON_ACCOUNT_HEADINGS = new Set(['summary', 'décompte', 'decompte', 'related', 'sources']);
 
@@ -147,12 +150,222 @@ export function buildContactsGraph(model: WikiModel): ContactsGraphResult {
       clients: [account.slug],
       title: title || undefined,
     });
-    links.push({ source: id, target: account.id });
+    links.push({ source: id, target: account.id, kind: 'member' });
     openTargets.set(id, contactsPath);
     account.count += 1;
     contactCount += 1;
   }
   flushAccountDegree();
 
+  // Enrich with contact-to-contact influence edges parsed from the influence
+  // map page (best-effort; a no-op when the page is absent or not yet loaded).
+  addInfluenceLinks(model, nodes, links);
+
   return { graph: { nodes, links }, openTargets, contactCount };
+}
+
+// ── Influence map (contact ↔ contact edges) ─────────────────────────────────
+
+/** A contact node indexed for fuzzy name matching against the influence map. */
+interface ContactIndexEntry {
+  id: string;
+  /** Account slug this contact belongs to (e.g. `stellantis`). */
+  slug: string;
+  /** Normalized full name (accent-free, lowercased, single-spaced). */
+  full: string;
+  /** Tokens of {@link full}. */
+  tokens: string[];
+  /** Last token — the surname in most cases. */
+  last: string;
+  /** Last two tokens joined — handles compound surnames ("el khoury"). */
+  last2: string;
+}
+
+/** Accent-fold + lowercase + collapse to single spaces (keeps letters/digits). */
+function normalizeName(raw: string): string {
+  return raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+/** Locate the influence map page (by slug, then by `influence` tag). */
+function findInfluenceFile(model: WikiModel): WikiFile | null {
+  const bySlug = model.files.find((f) => f.slug === INFLUENCE_SLUG);
+  if (bySlug) return bySlug;
+  return model.files.find((f) => f.tags.includes('influence') && f.tags.includes('contacts')) ?? null;
+}
+
+/** Build a per-account index of contact nodes for name matching. */
+function indexContacts(nodes: GraphNode[]): Map<string, ContactIndexEntry[]> {
+  const byAccount = new Map<string, ContactIndexEntry[]>();
+  for (const n of nodes) {
+    if (!n.id.startsWith('contact:')) continue;
+    const slug = n.clients[0];
+    if (!slug) continue;
+    const full = normalizeName(n.label);
+    const tokens = full.split(' ').filter(Boolean);
+    if (tokens.length === 0) continue;
+    const last = tokens[tokens.length - 1];
+    const last2 = tokens.length >= 2 ? `${tokens[tokens.length - 2]} ${last}` : last;
+    const entry: ContactIndexEntry = { id: n.id, slug, full, tokens, last, last2 };
+    const bucket = byAccount.get(slug);
+    if (bucket) bucket.push(entry);
+    else byAccount.set(slug, [entry]);
+  }
+  return byAccount;
+}
+
+/** Score how well a contact matches a (possibly partial) name from the map. */
+function matchScore(entry: ContactIndexEntry, qNorm: string, qTokens: string[], qLast: string): number {
+  if (entry.full === qNorm) return 100;
+  if (entry.last2 === qNorm) return 90;
+  if (qTokens.length >= 2 && entry.full.includes(qNorm)) return 80;
+  if (entry.last === qLast) return 70;
+  if (entry.tokens.includes(qLast)) return 50;
+  return 0;
+}
+
+/**
+ * Resolve a name reference from the influence map to a contact node id, scoped
+ * to the accounts of the current section. Returns null when there is no match
+ * or the match is ambiguous (two contacts tie on the best score).
+ */
+function resolveContact(
+  name: string,
+  slugs: string[],
+  index: Map<string, ContactIndexEntry[]>,
+): string | null {
+  const qNorm = normalizeName(name);
+  if (!qNorm) return null;
+  const qTokens = qNorm.split(' ').filter(Boolean);
+  const qLast = qTokens[qTokens.length - 1];
+
+  let best: ContactIndexEntry | null = null;
+  let bestScore = 0;
+  let tie = false;
+  for (const slug of slugs) {
+    for (const entry of index.get(slug) ?? []) {
+      const score = matchScore(entry, qNorm, qTokens, qLast);
+      if (score === 0) continue;
+      if (score > bestScore) {
+        bestScore = score;
+        best = entry;
+        tie = false;
+      } else if (score === bestScore && entry.id !== best?.id) {
+        tie = true;
+      }
+    }
+  }
+  return best && !tie ? best.id : null;
+}
+
+/** Which account slugs a section heading refers to (heading may span several). */
+function sectionSlugs(heading: string, accountSlugs: Set<string>): string[] {
+  const norm = normalizeName(heading);
+  return [...accountSlugs].filter((slug) => norm.includes(slug));
+}
+
+/**
+ * Extract the ordered name chains from a cluster's "central link" cell, e.g.
+ * `Dessables ↔ Fernandez ↔ Renee` or `Penet ↔ Mrad · Negi ↔ Arora`
+ * (independent chains separated by `·`), plus any `(+ Brown, Dillon)` extras
+ * that attach to the preceding chain's last member.
+ */
+function parseChains(cell: string): { chains: string[][]; extras: string[] } {
+  const extras: string[] = [];
+  // Pull out parenthetical additions like "(+ Brown, Dillon)".
+  const main = cell.replace(/\(([^)]*)\)/g, (_, inner: string) => {
+    for (const part of String(inner).replace(/^\s*\+/, '').split(/[,;]/)) {
+      const name = part.trim();
+      if (name) extras.push(name);
+    }
+    return '';
+  });
+  const chains = main
+    .split(/[·•]/)
+    .map((seg) =>
+      seg
+        .split(/[↔→←⇄⇔]/)
+        .map((s) => s.replace(/[*_`]/g, '').trim())
+        .filter(Boolean),
+    )
+    .filter((chain) => chain.length > 0);
+  return { chains, extras };
+}
+
+/**
+ * Parse the influence map's "clusters" tables and add contact ↔ contact
+ * influence links to the graph, bumping the degree of connected contacts so the
+ * most influential ones render larger. Silently does nothing when the page is
+ * missing, not yet loaded, or contains no recognizable cluster table.
+ */
+function addInfluenceLinks(model: WikiModel, nodes: GraphNode[], links: GraphLink[]): void {
+  const file = findInfluenceFile(model);
+  if (!file || !file.content) return;
+
+  const index = indexContacts(nodes);
+  if (index.size === 0) return;
+  const accountSlugs = new Set(index.keys());
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+
+  // Dedupe against structural (member) links and repeated influence edges.
+  const seen = new Set<string>();
+  for (const l of links) seen.add(l.source < l.target ? `${l.source}|${l.target}` : `${l.target}|${l.source}`);
+
+  const addEdge = (a: string | null, b: string | null): void => {
+    if (!a || !b || a === b) return;
+    const key = a < b ? `${a}|${b}` : `${b}|${a}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    links.push({ source: a, target: b, kind: 'influence' });
+    const na = nodeById.get(a);
+    const nb = nodeById.get(b);
+    if (na) na.degree += 1;
+    if (nb) nb.degree += 1;
+  };
+
+  const lines = file.content.split(/\r?\n/);
+  let slugs: string[] = [];
+  let linkColumn = -1; // index of the "Lien central" column, -1 when not in a cluster table.
+
+  for (const line of lines) {
+    const heading = /^##\s+(.+?)\s*$/.exec(line);
+    if (heading) {
+      slugs = sectionSlugs(heading[1], accountSlugs);
+      linkColumn = -1;
+      continue;
+    }
+    if (!line.trim().startsWith('|')) {
+      linkColumn = -1; // any non-table line ends the current table.
+      continue;
+    }
+    if (slugs.length === 0) continue;
+
+    const cells = splitRow(line);
+    if (isSeparatorRow(cells)) continue;
+
+    if (linkColumn === -1) {
+      // Header row: locate the central-link column to start parsing a cluster.
+      const idx = cells.findIndex((c) => normalizeName(c) === 'lien central');
+      if (idx !== -1) linkColumn = idx;
+      continue;
+    }
+
+    const cell = cells[linkColumn];
+    if (!cell) continue;
+    const { chains, extras } = parseChains(cell);
+    let anchor: string | null = null;
+    for (const chain of chains) {
+      const ids = chain.map((name) => resolveContact(name, slugs, index));
+      for (let i = 0; i < ids.length - 1; i++) addEdge(ids[i], ids[i + 1]);
+      const resolved = ids.filter(Boolean).slice(-1)[0] ?? null;
+      if (resolved) anchor = resolved;
+    }
+    // Extras (e.g. "(+ Brown, Dillon)") attach to the last resolved member.
+    if (anchor) for (const ex of extras) addEdge(anchor, resolveContact(ex, slugs, index));
+  }
 }
