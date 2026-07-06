@@ -567,6 +567,10 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder 
           placeholder={searchPlaceholder ?? t('graph.searchPage')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
         />
         <label className="wv-graph-toggle">
           <input

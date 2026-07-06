@@ -5,6 +5,7 @@
  * highlighted snippet around the first content match.
  */
 import type { WikiModel } from './wiki';
+import { isUnderscoreHidden } from './wiki';
 
 export interface SearchSegment {
   text: string;
@@ -82,6 +83,8 @@ export function searchWiki(model: WikiModel, query: string, limit = 40): SearchR
 
   const results: SearchResult[] = [];
   for (const file of model.files) {
+    // Skip underscore-prefixed stub/meta pages (hidden like in tree + graph).
+    if (isUnderscoreHidden(file.path)) continue;
     const title = file.title || file.slug;
     const titleLower = title.toLowerCase();
     const pathLower = file.path.toLowerCase();

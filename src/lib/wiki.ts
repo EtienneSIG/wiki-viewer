@@ -384,6 +384,15 @@ export function buildModel(rootName: string, files: WikiFile[]): WikiModel {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/**
+ * True when any path segment is underscore-prefixed (e.g. `_index.md`,
+ * `_queries/…`). These follow the wiki convention for stub / aggregate / meta
+ * pages and are hidden from the file tree, the graph and full-text search.
+ */
+export function isUnderscoreHidden(path: string): boolean {
+  return path.split('/').some((p) => p.startsWith('_'));
+}
+
 function normalizeKey(value: string): string {
   return value
     .trim()
@@ -452,7 +461,7 @@ function buildTree(files: WikiFile[]): TreeNode[] {
   for (const f of files) {
     const parts = f.path.split('/');
     // Hide underscore-prefixed files and folders (e.g. _index.md, _queries/).
-    if (parts.some((p) => p.startsWith('_'))) continue;
+    if (isUnderscoreHidden(f.path)) continue;
     // Hide specific meta/hub pages from the tree (e.g. the Karpathy wiki-pattern page).
     if (isHiddenSlug(f.path)) continue;
     let cur = root;
