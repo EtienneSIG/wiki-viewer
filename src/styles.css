@@ -502,17 +502,12 @@ a:focus-visible,
 /* Client filter pinned to the bottom of the sidebar. */
 .wv-sidebar-filter {
   flex-shrink: 0;
-  border-top: 1px solid var(--border);
-  padding: 0.5rem 0.7rem 0.6rem;
-  background: var(--surface);
-}
-
-.wv-sidebar-filter-head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.4rem;
+  flex-direction: column;
+  gap: 0.3rem;
+  border-top: 1px solid var(--border);
+  padding: 0.55rem 0.7rem 0.65rem;
+  background: var(--surface);
 }
 
 .wv-sidebar-filter-title {
@@ -522,53 +517,26 @@ a:focus-visible,
   color: var(--muted);
 }
 
-.wv-sidebar-filter-all {
-  background: transparent;
-  color: var(--accent-text);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.1rem 0.45rem;
-  font-size: 0.72rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.12s ease;
-}
-
-.wv-sidebar-filter-all:hover:not(:disabled) {
-  background: var(--surface-hover);
-}
-
-.wv-sidebar-filter-all:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.wv-sidebar-filter-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  max-height: 9rem;
-  overflow: auto;
-}
-
-.wv-sidebar-filter-item {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.12rem 0.2rem;
+.wv-sidebar-filter-select {
+  width: 100%;
+  padding: 0.32rem 0.5rem;
   font-size: 0.82rem;
   color: var(--fg);
-  cursor: pointer;
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
-}
-
-.wv-sidebar-filter-item:hover {
-  background: var(--surface-hover);
-}
-
-.wv-sidebar-filter-item input {
-  accent-color: var(--accent-text);
   cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+
+.wv-sidebar-filter-select:hover {
+  border-color: var(--accent-text);
+}
+
+.wv-sidebar-filter-select:focus-visible {
+  outline: none;
+  border-color: var(--accent-text);
+  box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
 .markdit-sidebar-error {

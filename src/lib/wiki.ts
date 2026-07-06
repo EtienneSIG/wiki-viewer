@@ -340,7 +340,7 @@ export function buildModel(rootName: string, files: WikiFile[]): WikiModel {
   // prefixed with `<client>-` (the project naming convention).
   const clientSlugs = new Set<string>();
   for (const f of files) {
-    if (f.category.toLowerCase() === 'clients' && f.slug !== '_index') {
+    if (f.category.toLowerCase() === 'clients' && !f.slug.startsWith('_')) {
       clientSlugs.add(f.slug.toLowerCase());
     }
   }

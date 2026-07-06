@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   forceSimulation,
   forceLink,
@@ -20,6 +20,9 @@ export interface GraphViewProps {
   theme: ThemeId;
   /** Placeholder for the search box (defaults to "Rechercher une page…"). */
   searchPlaceholder?: string;
+  /** Client slug to restrict the graph to (empty = no restriction). Driven by
+   *  the sidebar filter so wiki, graph and contacts stay in sync. */
+  clientFilter?: string;
 }
 
 interface GNode extends SimulationNodeDatum {
@@ -107,7 +110,7 @@ function themeColors(theme: ThemeId): Palettes {
  * Pan (drag background), zoom (wheel), drag nodes, hover to highlight neighbors,
  * click a node to open the page. Search dims non-matches; orphans can be hidden.
  */
-export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder }: GraphViewProps): JSX.Element {
+export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder, clientFilter = '' }: GraphViewProps): JSX.Element {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -130,17 +133,9 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder 
   const [search, setSearch] = useState('');
   const [showOrphans, setShowOrphans] = useState(true);
   const [showLabels, setShowLabels] = useState(false);
-  const [clientFilter, setClientFilter] = useState('');
   const [spacing, setSpacing] = useState(1.4);
   const spacingRef = useRef(1.4);
   const [legend, setLegend] = useState<{ group: string; color: string }[]>([]);
-
-  // All client slugs present in the graph, for the "filtre par client" dropdown.
-  const clientOptions = useMemo(() => {
-    const set = new Set<string>();
-    for (const n of graph.nodes) for (const c of n.clients) set.add(c);
-    return [...set].sort((a, b) => a.localeCompare(b));
-  }, [graph]);
 
   // Keep style refs in sync and repaint when purely visual state changes.
   useEffect(() => {
@@ -600,22 +595,6 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder 
             aria-label={t('graph.spacingAria')}
           />
         </label>
-        {clientOptions.length > 0 && (
-          <select
-            className="wv-graph-select"
-            value={clientFilter}
-            onChange={(e) => setClientFilter(e.target.value)}
-            aria-label={t('graph.filterClient')}
-            title={t('graph.filterClient')}
-          >
-            <option value="">{t('graph.allClients')}</option>
-            {clientOptions.map((c) => (
-              <option key={c} value={c}>
-                {c.charAt(0).toUpperCase() + c.slice(1)}
-              </option>
-            ))}
-          </select>
-        )}
         <div className="wv-graph-buttons">
           <button type="button" className="wv-graph-reset" onClick={reorganize}>
             {t('graph.reorganize')}
