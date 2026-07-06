@@ -7,7 +7,7 @@ import { Backlinks } from '../components/backlinks/Backlinks';
 import { GraphView } from '../components/graph/GraphView';
 import { StatusBar } from '../components/statusbar/StatusBar';
 import { SearchPanel } from '../components/search/SearchPanel';
-import { scanEntries, buildLightModel, readEntries, buildModel, type WikiModel } from '../lib/wiki';
+import { scanEntries, buildLightModel, readEntries, buildModel, buildClientTree, type WikiModel } from '../lib/wiki';
 import { buildContactsGraph } from '../lib/contacts';
 import { splitFrontmatter, joinFrontmatter } from '../lib/frontmatter';
 import { writeFileHandle, loadFolders, saveFolders, readFileAtPath } from '../lib/folder-handle';
@@ -53,6 +53,8 @@ export function App(): JSX.Element {
   const [locale, setLocaleState] = useState<Locale>(() => getLocale());
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Selected client slugs for the sidebar filter (empty = show the whole wiki).
+  const [clientFilter, setClientFilter] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [indexing, setIndexing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +75,15 @@ export function App(): JSX.Element {
   // page. Rebuilt whenever the model changes (i.e. after background indexing
   // populates page contents).
   const contacts = useMemo(() => (model ? buildContactsGraph(model) : null), [model]);
+
+  // Sidebar file tree, optionally restricted to the selected client(s). Stale
+  // selections (e.g. after opening another wiki) are ignored, and an empty
+  // selection shows the full tree.
+  const treeNodes = useMemo(() => {
+    if (!model) return [];
+    const selected = clientFilter.filter((c) => model.clients.includes(c));
+    return selected.length ? buildClientTree(model.files, selected) : model.tree;
+  }, [model, clientFilter]);
 
   // Resolve a root-relative asset path (e.g. an image referenced from Markdown)
   // to an object URL, reading it from the opened folder. Stays offline-first.
@@ -452,8 +463,40 @@ export function App(): JSX.Element {
               {model.files.length === 0 && !error && (
                 <p className="markdit-sidebar-empty">{t('sidebar.noPages')}</p>
               )}
-              <FileTree nodes={model.tree} activePath={activePath} onSelect={openPath} />
+              <FileTree nodes={treeNodes} activePath={activePath} onSelect={openPath} />
             </div>
+            {model.clients.length > 0 && (
+              <div className="wv-sidebar-filter" role="group" aria-label={t('sidebar.filterClient')}>
+                <div className="wv-sidebar-filter-head">
+                  <span className="wv-sidebar-filter-title">{t('sidebar.filterClient')}</span>
+                  <button
+                    type="button"
+                    className="wv-sidebar-filter-all"
+                    onClick={() => setClientFilter([])}
+                    disabled={clientFilter.length === 0}
+                    title={t('sidebar.allClients')}
+                  >
+                    {t('sidebar.allClients')}
+                  </button>
+                </div>
+                <div className="wv-sidebar-filter-list">
+                  {model.clients.map((c) => (
+                    <label key={c} className="wv-sidebar-filter-item">
+                      <input
+                        type="checkbox"
+                        checked={clientFilter.includes(c)}
+                        onChange={(e) =>
+                          setClientFilter((cur) =>
+                            e.target.checked ? [...cur, c] : cur.filter((x) => x !== c),
+                          )
+                        }
+                      />
+                      <span>{c.charAt(0).toUpperCase() + c.slice(1)}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </aside>
         )}
 

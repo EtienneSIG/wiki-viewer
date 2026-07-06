@@ -52,6 +52,8 @@ export interface WikiFile {
   handle: FileSystemFileHandle;
   /** Resolved outgoing links (paths of existing pages). */
   outLinks: string[];
+  /** Client slugs this page is associated with (drives the sidebar filter). */
+  clients: string[];
 }
 
 export interface GraphNode {
@@ -96,6 +98,8 @@ export interface WikiModel {
   byPath: Map<string, WikiFile>;
   tree: TreeNode[];
   graph: WikiGraph;
+  /** Sorted list of client slugs found in the wiki (for the sidebar filter). */
+  clients: string[];
   /** path → paths of pages that link to it. */
   backlinks: Map<string, string[]>;
   /** Resolve a `[[target]]` to a navigable href for the reader. */
@@ -227,6 +231,7 @@ function buildFile(rf: RawFile, content: string): WikiFile {
       content,
       handle: rf.handle,
       outLinks: [],
+      clients: [],
     };
   }
 
@@ -247,6 +252,7 @@ function buildFile(rf: RawFile, content: string): WikiFile {
     content,
     handle: rf.handle,
     outLinks: [],
+    clients: [],
   };
 }
 
@@ -364,6 +370,11 @@ export function buildModel(rootName: string, files: WikiFile[]): WikiModel {
       clients: clientsOf(f),
     }));
 
+  // Cache the client association on every file so the sidebar can filter the
+  // tree by client without recomputing, and expose the full sorted client list.
+  for (const f of files) f.clients = clientsOf(f);
+  const clients = [...clientSlugs].sort((a, b) => a.localeCompare(b));
+
   const resolve = (target: string): WikiResolveResult => {
     const path = resolveTarget(target);
     return path
@@ -377,6 +388,7 @@ export function buildModel(rootName: string, files: WikiFile[]): WikiModel {
     byPath,
     tree: buildTree(files),
     graph: { nodes, links },
+    clients,
     backlinks,
     resolve,
   };
@@ -482,6 +494,17 @@ function buildTree(files: WikiFile[]): TreeNode[] {
   }
   sortTree(root);
   return root.children ?? [];
+}
+
+/**
+ * File tree restricted to pages associated with any of the given client slugs.
+ * An empty selection returns the full tree (no filter). Excalidraw diagrams and
+ * other non-client pages are dropped when a filter is active.
+ */
+export function buildClientTree(files: WikiFile[], clients: string[]): TreeNode[] {
+  if (clients.length === 0) return buildTree(files);
+  const set = new Set(clients.map((c) => c.toLowerCase()));
+  return buildTree(files.filter((f) => f.clients.some((c) => set.has(c))));
 }
 
 function sortTree(node: TreeNode): void {
