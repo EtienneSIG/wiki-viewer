@@ -20,6 +20,10 @@ jobs:
           - os: macos-latest
             platform: mac
     runs-on: ${{ matrix.os }}
+    # A failing macOS leg must not block the release: Windows is the primary
+    # target. `continue-on-error` keeps the workflow green and lets `release`
+    # proceed and publish whatever artifacts did build.
+    continue-on-error: ${{ matrix.platform == 'mac' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,7 +54,9 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    # Run whenever a tag is pushed, even if a (non-blocking) build leg failed,
+    # so a successful Windows build still publishes the release.
+    if: always() && startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
