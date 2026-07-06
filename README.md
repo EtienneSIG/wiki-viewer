@@ -1,7 +1,7 @@
 # Wiki Viewer
 
 A web interface to view, browse and edit a Markdown wiki — designed for the
-[`memory/`](../memory) folder but works with any folder of `.md` notes. Inspired
+[`memory/`](https://github.com/EtienneSIG/memory) folder but works with any folder of `.md` notes. Inspired
 by [Obsidian](https://obsidian.md) (graph view + backlinks) and built on the
 rendering/editing engine of [**Markdit**](https://github.com/EtienneSIG/Markdit).
 
