@@ -20,6 +20,13 @@ Grab the latest Windows and macOS builds from the
 
 ![Wiki Viewer graph view](docs/screenshots/graph-light.png)
 
+### Contacts graph — customer accounts, contacts, influence & co-occurrence
+
+A second, purpose-built graph focused on customer **contacts**: each account
+(Alstom, Michelin, Stellantis…) is a hub, every contact a leaf. It overlays
+**inferred influence** edges and an optional **empirical co-occurrence** layer,
+and marks **sponsors / detractors** and **trusted advisors**.
+
 ### Full-text search — `Ctrl/Cmd + K`
 
 ![Wiki Viewer search palette](docs/screenshots/search-light.png)
@@ -41,6 +48,20 @@ Grab the latest Windows and macOS builds from the
   edges = `[[links]]`. Wheel zoom, panning, node dragging, hover to isolate
   neighbors, search, hide orphans, labels, per-category legend. Click a node to
   open the page.
+- **Contacts graph** — a second graph built from the per-account contact
+  directory pages (`contacts-<account>.md`): each account is a hub and every
+  contact a leaf. On top of the account↔contact spokes it adds:
+  - **Influence edges** — inferred contact↔contact relationships parsed from the
+    influence map page (`contact-influence-map.md`), drawn dashed/orange.
+  - **Co-occurrence edges** — an **optional** empirical layer (toggle) from the
+    meeting/mail co-participation page (`contact-cooccurrence-network.md`),
+    drawn finely dotted/teal.
+  - **Stance & advisor markers** — a green (sponsor) / red (detractor) ring and a
+    gold *trusted-advisor* dot, read from the directory tables.
+  - A **“links shown”** control (all / classic / influence) and node labels on
+    by default.
+- **Client filter** — a dropdown at the bottom of the sidebar restricts the whole
+  app — file tree, page graph **and** contacts graph — to a single client (or all).
 - **`[[wikilinks]]`** — `[[target]]` and `[[target|alias]]` links become
   clickable in the reader; missing targets are flagged visually.
 - **Backlinks** — side panel listing the pages that point to the current page,
@@ -48,6 +69,8 @@ Grab the latest Windows and macOS builds from the
 - **Full-text search** — search palette (magnifier button or `Ctrl/Cmd + K`) that
   scans titles and content of every page, with highlighted excerpts, relevance
   ranking and keyboard navigation (↑/↓, Enter, Esc).
+- **Update check** — the status bar shows the running version and checks the
+  GitHub Releases API for a newer build (anonymous, cached, offline-friendly).
 - **Themes** — system / light / dark / high contrast.
 - **Multilingual** — interface in **English** and **French**; toggle via the
   language button in the toolbar. The language is detected from the browser on
@@ -126,7 +149,13 @@ git push origin v0.1.0   # triggers the cross-platform build + release
 - **Wiki model** (`src/lib/wiki.ts`): scans the folder, resolves `[[links]]` (by
   slug, title or path), builds the file tree, the graph and the backlinks.
   `buildModel()` is pure (no browser API) and recomputed after each save to
-  refresh the graph/backlinks.
+  refresh the graph/backlinks. Underscore-prefixed pages (`_index.md`, …) are
+  hidden from the tree, graph and search; each page is tagged with its client(s)
+  for the sidebar filter.
+- **Contacts graph** (`src/lib/contacts.ts`): parses the per-account contact
+  directory pages into an account/contact graph, then enriches it with influence
+  edges (`contact-influence-map.md`) and optional co-occurrence edges
+  (`contact-cooccurrence-network.md`), matching names per account.
 - **`[[wikilinks]]`** (`src/markdown/remark-wikilink.ts`): an mdast→mdast
   transform applied **only when rendering**, never to the editor's shared parse
   — so `[[...]]` Markdown is preserved byte-for-byte on save.
@@ -154,8 +183,8 @@ src/
 │   ├── backlinks/  Backlinks.tsx     (backlinks + outgoing links)
 │   ├── search/     SearchPanel.tsx   (full-text search palette)
 │   └── graph/      GraphView.tsx     (force-directed graph, canvas)
-├── lib/            wiki.ts, search.ts, frontmatter.ts, folder-handle.ts, i18n.ts,
-│                   version.ts, types.ts
+├── lib/            wiki.ts, contacts.ts (contacts graph), search.ts,
+│                   frontmatter.ts, folder-handle.ts, i18n.ts, version.ts, types.ts
 ├── markdown/       parse, render, sanitize, serialize, highlight, tiptap-bridge,
 │                   remark-wikilink
 └── styles.css      (Markdit + .wv-* additions)
