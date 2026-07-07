@@ -30,6 +30,9 @@ const PER_ACCOUNT_PREFIX = 'contacts-';
 /** Slug of the hierarchy/influence map page (contact-to-contact edges). */
 const INFLUENCE_SLUG = 'contact-influence-map';
 
+/** Slug of the empirical co-occurrence network page (weighted A ↔ B edges). */
+const COOCCURRENCE_SLUG = 'contact-cooccurrence-network';
+
 /** Section headings that are not account tables. */
 const NON_ACCOUNT_HEADINGS = new Set(['summary', 'décompte', 'decompte', 'related', 'sources']);
 
@@ -166,6 +169,8 @@ export function buildContactsGraph(model: WikiModel): ContactsGraphResult {
   // Enrich with contact-to-contact influence edges parsed from the influence
   // map page (best-effort; a no-op when the page is absent or not yet loaded).
   addInfluenceLinks(model, nodes, links);
+  // Then the empirical co-occurrence edges (opt-in layer, toggled in the UI).
+  addCooccurrenceLinks(model, nodes, links);
 
   return { graph: { nodes, links }, openTargets, contactCount };
 }
@@ -361,6 +366,15 @@ function findInfluenceFile(model: WikiModel): WikiFile | null {
   return model.files.find((f) => f.tags.includes('influence') && f.tags.includes('contacts')) ?? null;
 }
 
+/** Locate the co-occurrence network page (by slug, then by `cooccurrence` tag). */
+function findCooccurrenceFile(model: WikiModel): WikiFile | null {
+  const bySlug = model.files.find((f) => f.slug === COOCCURRENCE_SLUG);
+  if (bySlug) return bySlug;
+  return (
+    model.files.find((f) => f.tags.includes('cooccurrence') && f.tags.includes('contacts')) ?? null
+  );
+}
+
 /** Build a per-account index of contact nodes for name matching. */
 function indexContacts(nodes: GraphNode[]): Map<string, ContactIndexEntry[]> {
   const byAccount = new Map<string, ContactIndexEntry[]>();
@@ -529,5 +543,60 @@ function addInfluenceLinks(model: WikiModel, nodes: GraphNode[], links: GraphLin
     }
     // Extras (e.g. "(+ Brown, Dillon)") attach to the last resolved member.
     if (anchor) for (const ex of extras) addEdge(anchor, resolveContact(ex, slugs, index));
+  }
+}
+
+/**
+ * Parse the co-occurrence network page's per-account "Arêtes" tables (whose
+ * first column is `Name A ↔ Name B`) and add empirical `cooccurrence` edges
+ * between contacts. Opt-in layer, toggled in the graph UI. No-op when the page
+ * is missing or not yet loaded. Deduped against links already present so an
+ * edge is only added once (influence/member edges take precedence).
+ */
+function addCooccurrenceLinks(model: WikiModel, nodes: GraphNode[], links: GraphLink[]): void {
+  const file = findCooccurrenceFile(model);
+  if (!file || !file.content) return;
+
+  const index = indexContacts(nodes);
+  if (index.size === 0) return;
+  const accountSlugs = new Set(index.keys());
+
+  const seen = new Set<string>();
+  for (const l of links) seen.add(l.source < l.target ? `${l.source}|${l.target}` : `${l.target}|${l.source}`);
+
+  const addEdge = (a: string | null, b: string | null): void => {
+    if (!a || !b || a === b) return;
+    const key = a < b ? `${a}|${b}` : `${b}|${a}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    // Opt-in layer: do not bump degree so node sizes stay stable when hidden.
+    links.push({ source: a, target: b, kind: 'cooccurrence' });
+  };
+
+  const lines = file.content.split(/\r?\n/);
+  let slugs: string[] = [];
+
+  for (const line of lines) {
+    const heading = /^##\s+(.+?)\s*$/.exec(line);
+    if (heading) {
+      slugs = sectionSlugs(heading[1], accountSlugs);
+      continue;
+    }
+    if (slugs.length === 0) continue;
+    if (!line.trim().startsWith('|')) continue;
+
+    const cells = splitRow(line);
+    if (isSeparatorRow(cells)) continue;
+
+    // Edge rows have the pair in the first cell: "Name A ↔ Name B". The header
+    // row ("A ↔ B") and legend rows resolve to nothing and are harmless no-ops.
+    const cell = cells[0] ?? '';
+    if (!/[↔⇄⇔]/.test(cell)) continue;
+    const parts = cell
+      .split(/[↔⇄⇔]/)
+      .map((s) => s.replace(/[*_`]/g, '').trim())
+      .filter(Boolean);
+    if (parts.length !== 2) continue;
+    addEdge(resolveContact(parts[0], slugs, index), resolveContact(parts[1], slugs, index));
   }
 }

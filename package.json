@@ -1,7 +1,7 @@
 {
   "name": "wiki-viewer",
   "private": true,
-  "version": "0.4.7",
+  "version": "0.4.8",
   "type": "module",
   "description": "Obsidian-style wiki viewer with graph view, file tree and a Markdit-style reader/editor.",
   "license": "MIT",

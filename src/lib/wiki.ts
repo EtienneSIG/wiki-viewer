@@ -76,10 +76,11 @@ export interface GraphLink {
   target: string;
   /**
    * `member` = structural spoke (contact → account hub); `influence` = an
-   * inferred influence/collaboration edge between two contacts. Absent means
-   * a plain wiki page link. Lets the graph render influence edges distinctly.
+   * inferred influence/collaboration edge between two contacts; `cooccurrence` =
+   * an empirical meeting/mail co-participation edge. Absent means a plain wiki
+   * page link. Lets the graph render each edge kind distinctly.
    */
-  kind?: 'member' | 'influence';
+  kind?: 'member' | 'influence' | 'cooccurrence';
 }
 
 export interface WikiGraph {

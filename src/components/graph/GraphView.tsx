@@ -37,7 +37,7 @@ interface GNode extends SimulationNodeDatum {
   stance?: 'sponsor' | 'detractor' | 'neutral';
   advisor?: boolean;
 }
-type GLink = SimulationLinkDatum<GNode> & { kind?: 'member' | 'influence' };
+type GLink = SimulationLinkDatum<GNode> & { kind?: 'member' | 'influence' | 'cooccurrence' };
 
 interface Transform {
   x: number;
@@ -84,6 +84,8 @@ interface Palettes {
   bg: string;
   influence: string;
   influenceStrong: string;
+  cooccurrence: string;
+  cooccurrenceStrong: string;
 }
 
 function themeColors(theme: ThemeId): Palettes {
@@ -97,6 +99,8 @@ function themeColors(theme: ThemeId): Palettes {
         bg: '#1b1b1b',
         influence: 'rgba(232,115,12,0.4)',
         influenceStrong: 'rgba(255,150,60,0.95)',
+        cooccurrence: 'rgba(42,170,152,0.4)',
+        cooccurrenceStrong: 'rgba(70,200,180,0.95)',
       }
     : {
         fg: '#333333',
@@ -106,6 +110,8 @@ function themeColors(theme: ThemeId): Palettes {
         bg: '#ffffff',
         influence: 'rgba(200,90,0,0.4)',
         influenceStrong: 'rgba(200,90,0,0.9)',
+        cooccurrence: 'rgba(20,140,125,0.4)',
+        cooccurrenceStrong: 'rgba(20,140,125,0.9)',
       };
 }
 
@@ -138,6 +144,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
   const [showOrphans, setShowOrphans] = useState(true);
   const [showLabels, setShowLabels] = useState(initialShowLabels);
   const [linkMode, setLinkMode] = useState<'all' | 'classic' | 'influence'>('all');
+  const [showCooccurrence, setShowCooccurrence] = useState(false);
   const [spacing, setSpacing] = useState(1.4);
   const spacingRef = useRef(1.4);
   const [legend, setLegend] = useState<{ group: string; color: string }[]>([]);
@@ -145,6 +152,9 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
   // Whether this graph carries influence edges (contacts graph) — gates the
   // "links" filter control below.
   const hasInfluence = graph.links.some((l) => l.kind === 'influence');
+  // Whether this graph carries empirical co-occurrence edges — gates the opt-in
+  // co-occurrence toggle.
+  const hasCooccurrence = graph.links.some((l) => l.kind === 'cooccurrence');
   // Whether any node carries a sponsor/detractor stance or advisor flag —
   // gates the stance legend.
   const hasStance = graph.nodes.some(
@@ -218,13 +228,16 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
     const present = new Set(nodes.map((n) => n.id));
     const links: GLink[] = graph.links
       .filter((l) => present.has(l.source) && present.has(l.target))
-      .filter((l) =>
-        linkMode === 'all'
+      .filter((l) => {
+        // Co-occurrence is an independent opt-in overlay; every other kind is
+        // governed by the "links shown" mode.
+        if (l.kind === 'cooccurrence') return showCooccurrence;
+        return linkMode === 'all'
           ? true
           : linkMode === 'influence'
             ? l.kind === 'influence'
-            : l.kind !== 'influence',
-      )
+            : l.kind !== 'influence';
+      })
       .map((l) => ({ source: l.source, target: l.target, kind: l.kind }));
 
     const nodeById = new Map(nodes.map((n) => [n.id, n]));
@@ -267,7 +280,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
     return () => {
       sim.stop();
     };
-  }, [graph, showOrphans, clientFilter, linkMode, focusActive]);
+  }, [graph, showOrphans, clientFilter, linkMode, showCooccurrence, focusActive]);
 
   // Canvas sizing (device-pixel-ratio aware) + resize handling.
   useEffect(() => {
@@ -341,11 +354,17 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
         const touchesFocus =
           focusId != null && (s.id === focusId || t.id === focusId);
         const influence = l.kind === 'influence';
+        const cooccurrence = l.kind === 'cooccurrence';
         if (influence) {
           // Influence edges: accented + dashed so they stand out from spokes.
           ctx.lineWidth = (touchesFocus ? 2 : 1.4) / k;
           ctx.strokeStyle = touchesFocus ? c.influenceStrong : c.influence;
           ctx.setLineDash([5 / k, 4 / k]);
+        } else if (cooccurrence) {
+          // Empirical co-occurrence edges: teal, finely dotted.
+          ctx.lineWidth = (touchesFocus ? 1.8 : 1.2) / k;
+          ctx.strokeStyle = touchesFocus ? c.cooccurrenceStrong : c.cooccurrence;
+          ctx.setLineDash([1.5 / k, 3 / k]);
         } else {
           ctx.lineWidth = 1 / k;
           ctx.strokeStyle = touchesFocus ? c.linkStrong : c.link;
@@ -637,6 +656,16 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
             <option value="classic">{t('graph.linksClassic')}</option>
             <option value="influence">{t('graph.linksInfluence')}</option>
           </select>
+        )}
+        {hasCooccurrence && (
+          <label className="wv-graph-toggle">
+            <input
+              type="checkbox"
+              checked={showCooccurrence}
+              onChange={(e) => setShowCooccurrence(e.target.checked)}
+            />
+            {t('graph.cooccurrence')}
+          </label>
         )}
         <label className="wv-graph-slider">
           <span>{t('graph.spacing')}</span>
