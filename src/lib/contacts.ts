@@ -95,6 +95,26 @@ function isSeparatorRow(cells: string[]): boolean {
   return cells.every((c) => /^:?-{2,}:?$/.test(c) || c === '');
 }
 
+/** Normalize a table header cell: strip bold, accents, collapse to lowercase. */
+function normalizeHeader(raw: string): string {
+  return raw
+    .replace(/\*/g, '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+/** Map a "Sponsor / Détracteur" cell to a stance (undefined when blank). */
+function parseStance(raw: string): 'sponsor' | 'detractor' | 'neutral' | undefined {
+  const s = normalizeHeader(raw);
+  if (s.includes('sponsor')) return 'sponsor';
+  if (s.includes('detract')) return 'detractor';
+  if (s.includes('neutre') || s.includes('neutral')) return 'neutral';
+  return undefined;
+}
+
 /**
  * Build the contacts graph. Prefers the per-account directory pages
  * (`contacts-<slug>.md`); each page becomes ONE account hub whose contacts —
@@ -167,26 +187,36 @@ function addContactRows(
   seqStart: number,
 ): number {
   let seq = seqStart;
-  let sawHeader = false;
+  let cols: { name: number; title: number; advisor: number; stance: number } | null = null;
 
   for (const line of lines) {
     if (!line.trim().startsWith('|')) {
-      sawHeader = false; // any non-table line closes the current table.
+      cols = null; // any non-table line closes the current table.
       continue;
     }
     const cells = splitRow(line);
     if (isSeparatorRow(cells)) continue;
 
-    if (!sawHeader) {
-      const lower = cells.map((c) => c.toLowerCase());
-      if (lower.some((c) => c === 'nom' || c === 'name')) sawHeader = true;
+    if (!cols) {
+      // Header row: locate columns by name so extra columns (LinkedIn, trusted
+      // advisor, sponsor/detractor) don't shift the parsing.
+      const norm = cells.map(normalizeHeader);
+      const name = norm.findIndex((c) => c === 'nom' || c === 'name');
+      if (name === -1) continue; // not a contact table header
+      cols = {
+        name,
+        title: norm.findIndex((c) => c === 'titre' || c === 'title'),
+        advisor: norm.findIndex((c) => c.includes('trusted advisor') || c.includes('advisor')),
+        stance: norm.findIndex((c) => c.includes('sponsor') || c.includes('detract')),
+      };
       continue;
     }
 
-    // Data row: col 0 = name, col 2 = title (when present).
-    const name = cleanCell(cells[0] ?? '');
+    const name = cleanCell(cells[cols.name] ?? '');
     if (!name) continue;
-    const title = cleanCell(cells[2] ?? '');
+    const title = cols.title >= 0 ? cleanCell(cells[cols.title] ?? '') : '';
+    const advisor = cols.advisor >= 0 ? cleanCell(cells[cols.advisor] ?? '') !== '' : false;
+    const stance = cols.stance >= 0 ? parseStance(cells[cols.stance] ?? '') : undefined;
 
     const id = `contact:${account.slug}:${seq++}`;
     nodes.push({
@@ -196,6 +226,8 @@ function addContactRows(
       degree: 1,
       clients: [account.slug],
       title: title || undefined,
+      stance,
+      advisor: advisor || undefined,
     });
     links.push({ source: id, target: account.id, kind: 'member' });
     openTargets.set(id, leafPath);

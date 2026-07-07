@@ -65,6 +65,10 @@ export interface GraphNode {
   clients: string[];
   /** Optional secondary line (e.g. a contact's job title) shown on hover/focus. */
   title?: string;
+  /** Contacts graph only: sponsor / detractor stance for the contact. */
+  stance?: 'sponsor' | 'detractor' | 'neutral';
+  /** Contacts graph only: flagged as a trusted advisor. */
+  advisor?: boolean;
 }
 
 export interface GraphLink {

@@ -34,6 +34,8 @@ interface GNode extends SimulationNodeDatum {
   degree: number;
   clients: string[];
   title?: string;
+  stance?: 'sponsor' | 'detractor' | 'neutral';
+  advisor?: boolean;
 }
 type GLink = SimulationLinkDatum<GNode> & { kind?: 'member' | 'influence' };
 
@@ -143,6 +145,11 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
   // Whether this graph carries influence edges (contacts graph) — gates the
   // "links" filter control below.
   const hasInfluence = graph.links.some((l) => l.kind === 'influence');
+  // Whether any node carries a sponsor/detractor stance or advisor flag —
+  // gates the stance legend.
+  const hasStance = graph.nodes.some(
+    (n) => n.stance === 'sponsor' || n.stance === 'detractor' || n.advisor,
+  );
 
   // Keep style refs in sync and repaint when purely visual state changes.
   useEffect(() => {
@@ -197,7 +204,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
     const nodes: GNode[] = graph.nodes
       .filter((n) => !isHiddenFromGraph(n.id))
       .filter((n) => showOrphans || n.degree > 0)
-      .map((n) => ({ id: n.id, label: n.label, group: n.group, degree: n.degree, clients: n.clients, title: n.title }));
+      .map((n) => ({ id: n.id, label: n.label, group: n.group, degree: n.degree, clients: n.clients, title: n.title, stance: n.stance, advisor: n.advisor }));
 
     // "Filtre par client" (piloté par le menu de la sidebar) : ne conserve que
     // les nœuds rattachés au client sélectionné — filtrage strict, sans halo de
@@ -364,6 +371,27 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
         ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
         ctx.fillStyle = colors.get(n.group) ?? '#888';
         ctx.fill();
+
+        // Sponsor / detractor stance ring (contacts graph). Green = sponsor,
+        // red = detractor; neutral has no ring.
+        if (n.stance === 'sponsor' || n.stance === 'detractor') {
+          ctx.lineWidth = 2.5 / k;
+          ctx.strokeStyle = n.stance === 'sponsor' ? '#2e9e4f' : '#d13438';
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, r + 2 / k, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // Trusted-advisor marker: a small gold dot at the node's upper-right.
+        if (n.advisor) {
+          ctx.beginPath();
+          ctx.arc(n.x + r * 0.72, n.y - r * 0.72, Math.max(2, r * 0.32), 0, Math.PI * 2);
+          ctx.fillStyle = '#e3b341';
+          ctx.fill();
+          ctx.lineWidth = 1 / k;
+          ctx.strokeStyle = c.bg;
+          ctx.stroke();
+        }
 
         if (n.id === active || n.id === hover) {
           ctx.lineWidth = 2 / k;
@@ -638,6 +666,22 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
                 {l.group}
               </span>
             ))}
+          </div>
+        )}
+        {hasStance && (
+          <div className="wv-graph-legend wv-graph-legend-stance">
+            <span className="wv-graph-legend-item" title={t('graph.sponsor')}>
+              <span className="wv-graph-legend-ring" style={{ borderColor: '#2e9e4f' }} />
+              {t('graph.sponsor')}
+            </span>
+            <span className="wv-graph-legend-item" title={t('graph.detractor')}>
+              <span className="wv-graph-legend-ring" style={{ borderColor: '#d13438' }} />
+              {t('graph.detractor')}
+            </span>
+            <span className="wv-graph-legend-item" title={t('graph.advisor')}>
+              <span className="wv-graph-legend-dot" style={{ background: '#e3b341' }} />
+              {t('graph.advisor')}
+            </span>
           </div>
         )}
       </div>

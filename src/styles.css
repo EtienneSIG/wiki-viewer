@@ -1524,6 +1524,19 @@ a:focus-visible,
   border-radius: 50%;
   flex-shrink: 0;
 }
+.wv-graph-legend-ring {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+.wv-graph-legend-stance {
+  margin-top: 0.15rem;
+  padding-top: 0.3rem;
+  border-top: 1px solid var(--border);
+}
 .wv-graph-hint {
   position: absolute;
   bottom: 0.75rem;
