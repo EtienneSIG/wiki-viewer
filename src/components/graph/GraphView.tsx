@@ -135,9 +135,14 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
   const [search, setSearch] = useState('');
   const [showOrphans, setShowOrphans] = useState(true);
   const [showLabels, setShowLabels] = useState(initialShowLabels);
+  const [linkMode, setLinkMode] = useState<'all' | 'classic' | 'influence'>('all');
   const [spacing, setSpacing] = useState(1.4);
   const spacingRef = useRef(1.4);
   const [legend, setLegend] = useState<{ group: string; color: string }[]>([]);
+
+  // Whether this graph carries influence edges (contacts graph) — gates the
+  // "links" filter control below.
+  const hasInfluence = graph.links.some((l) => l.kind === 'influence');
 
   // Keep style refs in sync and repaint when purely visual state changes.
   useEffect(() => {
@@ -206,6 +211,13 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
     const present = new Set(nodes.map((n) => n.id));
     const links: GLink[] = graph.links
       .filter((l) => present.has(l.source) && present.has(l.target))
+      .filter((l) =>
+        linkMode === 'all'
+          ? true
+          : linkMode === 'influence'
+            ? l.kind === 'influence'
+            : l.kind !== 'influence',
+      )
       .map((l) => ({ source: l.source, target: l.target, kind: l.kind }));
 
     const nodeById = new Map(nodes.map((n) => [n.id, n]));
@@ -248,7 +260,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
     return () => {
       sim.stop();
     };
-  }, [graph, showOrphans, clientFilter, focusActive]);
+  }, [graph, showOrphans, clientFilter, linkMode, focusActive]);
 
   // Canvas sizing (device-pixel-ratio aware) + resize handling.
   useEffect(() => {
@@ -297,7 +309,12 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
       const hover = hoverRef.current;
       const active = activeRef.current;
       const query = searchRef.current;
-      const focusId = hover ?? active;
+      // Only treat the hover/active id as a focus when it is an actual node in
+      // this graph. In the contacts graph the "active" path is a wiki file, not
+      // a node id — without this guard every node would be dimmed and labels
+      // would never show.
+      const focusRaw = hover ?? active;
+      const focusId = focusRaw != null && adj.has(focusRaw) ? focusRaw : null;
       const focusSet = focusId ? adj.get(focusId) ?? new Set<string>() : null;
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -580,6 +597,19 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
           />
           {t('graph.labels')}
         </label>
+        {hasInfluence && (
+          <select
+            className="wv-graph-select"
+            value={linkMode}
+            onChange={(e) => setLinkMode(e.target.value as 'all' | 'classic' | 'influence')}
+            aria-label={t('graph.links')}
+            title={t('graph.links')}
+          >
+            <option value="all">{t('graph.linksAll')}</option>
+            <option value="classic">{t('graph.linksClassic')}</option>
+            <option value="influence">{t('graph.linksInfluence')}</option>
+          </select>
+        )}
         <label className="wv-graph-slider">
           <span>{t('graph.spacing')}</span>
           <input
