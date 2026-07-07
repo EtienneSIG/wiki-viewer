@@ -23,6 +23,8 @@ export interface GraphViewProps {
   /** Client slug to restrict the graph to (empty = no restriction). Driven by
    *  the sidebar filter so wiki, graph and contacts stay in sync. */
   clientFilter?: string;
+  /** Show node labels by default (used by the contacts graph). */
+  initialShowLabels?: boolean;
 }
 
 interface GNode extends SimulationNodeDatum {
@@ -110,7 +112,7 @@ function themeColors(theme: ThemeId): Palettes {
  * Pan (drag background), zoom (wheel), drag nodes, hover to highlight neighbors,
  * click a node to open the page. Search dims non-matches; orphans can be hidden.
  */
-export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder, clientFilter = '' }: GraphViewProps): JSX.Element {
+export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder, clientFilter = '', initialShowLabels = false }: GraphViewProps): JSX.Element {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -132,7 +134,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
 
   const [search, setSearch] = useState('');
   const [showOrphans, setShowOrphans] = useState(true);
-  const [showLabels, setShowLabels] = useState(false);
+  const [showLabels, setShowLabels] = useState(initialShowLabels);
   const [spacing, setSpacing] = useState(1.4);
   const spacingRef = useRef(1.4);
   const [legend, setLegend] = useState<{ group: string; color: string }[]>([]);
@@ -192,17 +194,12 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
       .filter((n) => showOrphans || n.degree > 0)
       .map((n) => ({ id: n.id, label: n.label, group: n.group, degree: n.degree, clients: n.clients, title: n.title }));
 
-    // "Filtre par client": keep the client's pages plus their direct neighbors
-    // (so the surrounding context stays visible), then drop everything else.
+    // "Filtre par client" (piloté par le menu de la sidebar) : ne conserve que
+    // les nœuds rattachés au client sélectionné — filtrage strict, sans halo de
+    // voisins, pour que la sélection isole vraiment le compte/le client.
     if (clientFilter) {
-      const direct = new Set(nodes.filter((n) => n.clients.includes(clientFilter)).map((n) => n.id));
-      const keep = new Set(direct);
-      for (const l of graph.links) {
-        if (direct.has(l.source)) keep.add(l.target);
-        if (direct.has(l.target)) keep.add(l.source);
-      }
       for (let i = nodes.length - 1; i >= 0; i--) {
-        if (!keep.has(nodes[i].id)) nodes.splice(i, 1);
+        if (!nodes[i].clients.includes(clientFilter)) nodes.splice(i, 1);
       }
     }
 

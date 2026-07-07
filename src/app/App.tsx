@@ -511,6 +511,7 @@ export function App(): JSX.Element {
                 theme={resolvedTheme}
                 searchPlaceholder={t('contacts.search')}
                 clientFilter={clientFilter}
+                initialShowLabels
               />
             ) : (
               <div className="wv-empty">
