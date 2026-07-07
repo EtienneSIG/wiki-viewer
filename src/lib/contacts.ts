@@ -2,9 +2,11 @@ import type { GraphLink, GraphNode, WikiFile, WikiGraph, WikiModel } from './wik
 
 /**
  * Contacts graph — a second, purpose-built graph that shows ONLY the customer
- * contacts (not wiki pages). It is derived from the "Customer Contacts
- * Directory" page: each account (Alstom, Michelin, …) becomes a central hub
- * node, and every contact under it becomes a leaf node linked to that hub.
+ * contacts (not wiki pages). It is derived from the per-account contact
+ * directory pages (`contacts-alstom`, `contacts-michelin`, …): each page becomes
+ * a central account hub node, and every contact listed on it becomes a leaf node
+ * linked to that hub. A legacy single-page directory layout is still supported
+ * as a fallback.
  *
  * The result reuses {@link WikiGraph} so the existing force-directed GraphView
  * can render it unchanged. Node ids are synthetic (`account:*` / `contact:*`),
@@ -19,8 +21,11 @@ export interface ContactsGraphResult {
   contactCount: number;
 }
 
-/** Slug of the canonical contacts directory page. */
+/** Slug of the canonical contacts directory page (now an index hub). */
 const CONTACTS_SLUG = 'customer-contacts-directory';
+
+/** Slug prefix of the per-account contact pages (contacts-alstom, …). */
+const PER_ACCOUNT_PREFIX = 'contacts-';
 
 /** Slug of the hierarchy/influence map page (contact-to-contact edges). */
 const INFLUENCE_SLUG = 'contact-influence-map';
@@ -35,6 +40,27 @@ export function findContactsFile(model: WikiModel): WikiFile | null {
   return (
     model.files.find((f) => f.tags.includes('contacts') && f.tags.includes('directory')) ?? null
   );
+}
+
+/**
+ * Per-account contact directory pages (one per client, e.g. `contacts-alstom`,
+ * `contacts-michelin`). These replaced the single all-accounts table page; the
+ * old `customer-contacts-directory` is now an index hub with no contact tables.
+ */
+export function findPerAccountContactFiles(model: WikiModel): WikiFile[] {
+  return model.files.filter(
+    (f) =>
+      f.slug.startsWith(PER_ACCOUNT_PREFIX) &&
+      f.tags.includes('contacts') &&
+      f.tags.includes('directory'),
+  );
+}
+
+/** Human label for an account hub, from the page title (before an em dash). */
+function accountLabelFromFile(file: WikiFile, slug: string): string {
+  const first = (file.title ?? '').split(/\s+[—–-]\s+/)[0].trim();
+  if (first && !/directory|annuaire/i.test(first)) return first;
+  return slug.charAt(0).toUpperCase() + slug.slice(1);
 }
 
 /** True when the page exists in the model (used to link account hubs to their client page). */
@@ -70,18 +96,127 @@ function isSeparatorRow(cells: string[]): boolean {
 }
 
 /**
- * Parse the contacts directory Markdown into a graph. Safe to call before the
- * page content is loaded — returns an empty graph in that case.
+ * Build the contacts graph. Prefers the per-account directory pages
+ * (`contacts-<slug>.md`); each page becomes ONE account hub whose contacts —
+ * across every table on the page (e.g. Michelin + its Euromaster subsidiary, or
+ * the three AXA sub-orgs) — attach as leaves. Falls back to the legacy
+ * single-page `## Account` layout when no per-account pages are present. Safe to
+ * call before content is loaded (returns an empty graph in that case).
  */
 export function buildContactsGraph(model: WikiModel): ContactsGraphResult {
   const nodes: GraphNode[] = [];
   const links: GraphLink[] = [];
   const openTargets = new Map<string, string>();
 
-  const file = findContactsFile(model);
-  if (!file || !file.content) {
-    return { graph: { nodes, links }, openTargets, contactCount: 0 };
+  const perAccount = findPerAccountContactFiles(model);
+  let contactCount = 0;
+  let seq = 0;
+
+  if (perAccount.length > 0) {
+    for (const file of perAccount) {
+      if (!file.content) continue;
+      const slug = file.slug.slice(PER_ACCOUNT_PREFIX.length);
+      if (!slug || nodes.some((n) => n.id === `account:${slug}`)) continue;
+
+      const id = `account:${slug}`;
+      const name = accountLabelFromFile(file, slug);
+      nodes.push({ id, label: name, group: name, degree: 0, clients: [slug] });
+      // Clicking a hub opens the client page if it exists, else the page itself.
+      openTargets.set(id, clientPagePath(model, slug) ?? file.path);
+
+      const before = seq;
+      seq = addContactRows(
+        file.content.split(/\r?\n/),
+        { name, slug, id },
+        file.path,
+        nodes,
+        links,
+        openTargets,
+        seq,
+      );
+      const added = seq - before;
+      contactCount += added;
+      const hub = nodes.find((n) => n.id === id);
+      if (hub) hub.degree = added;
+    }
+  } else {
+    contactCount = buildFromDirectoryPage(model, nodes, links, openTargets);
   }
+
+  // Enrich with contact-to-contact influence edges parsed from the influence
+  // map page (best-effort; a no-op when the page is absent or not yet loaded).
+  addInfluenceLinks(model, nodes, links);
+
+  return { graph: { nodes, links }, openTargets, contactCount };
+}
+
+/**
+ * Append every contact row found in `lines` as a leaf of `account`. Contact
+ * tables are detected by a header row containing a "Nom"/"Name" column; a table
+ * ends at the first non-table line, so several tables on one page (e.g.
+ * Michelin + Euromaster, or the three AXA sub-orgs) are all parsed. Returns the
+ * next free sequence number.
+ */
+function addContactRows(
+  lines: string[],
+  account: { name: string; slug: string; id: string },
+  leafPath: string,
+  nodes: GraphNode[],
+  links: GraphLink[],
+  openTargets: Map<string, string>,
+  seqStart: number,
+): number {
+  let seq = seqStart;
+  let sawHeader = false;
+
+  for (const line of lines) {
+    if (!line.trim().startsWith('|')) {
+      sawHeader = false; // any non-table line closes the current table.
+      continue;
+    }
+    const cells = splitRow(line);
+    if (isSeparatorRow(cells)) continue;
+
+    if (!sawHeader) {
+      const lower = cells.map((c) => c.toLowerCase());
+      if (lower.some((c) => c === 'nom' || c === 'name')) sawHeader = true;
+      continue;
+    }
+
+    // Data row: col 0 = name, col 2 = title (when present).
+    const name = cleanCell(cells[0] ?? '');
+    if (!name) continue;
+    const title = cleanCell(cells[2] ?? '');
+
+    const id = `contact:${account.slug}:${seq++}`;
+    nodes.push({
+      id,
+      label: name,
+      group: account.name,
+      degree: 1,
+      clients: [account.slug],
+      title: title || undefined,
+    });
+    links.push({ source: id, target: account.id, kind: 'member' });
+    openTargets.set(id, leafPath);
+  }
+
+  return seq;
+}
+
+/**
+ * Legacy fallback: parse a single all-accounts directory page whose `## Account`
+ * headings each introduce a contact table. Retained for wikis that still use the
+ * old monolithic `customer-contacts-directory` layout.
+ */
+function buildFromDirectoryPage(
+  model: WikiModel,
+  nodes: GraphNode[],
+  links: GraphLink[],
+  openTargets: Map<string, string>,
+): number {
+  const file = findContactsFile(model);
+  if (!file || !file.content) return 0;
 
   const contactsPath = file.path;
   const lines = file.content.split(/\r?\n/);
@@ -141,10 +276,9 @@ export function buildContactsGraph(model: WikiModel): ContactsGraphResult {
     const title = cleanCell(cells[2] ?? '');
 
     const id = `contact:${account.slug}:${seq++}`;
-    const label = name;
     nodes.push({
       id,
-      label,
+      label: name,
       group: account.name,
       degree: 1,
       clients: [account.slug],
@@ -157,11 +291,7 @@ export function buildContactsGraph(model: WikiModel): ContactsGraphResult {
   }
   flushAccountDegree();
 
-  // Enrich with contact-to-contact influence edges parsed from the influence
-  // map page (best-effort; a no-op when the page is absent or not yet loaded).
-  addInfluenceLinks(model, nodes, links);
-
-  return { graph: { nodes, links }, openTargets, contactCount };
+  return contactCount;
 }
 
 // ── Influence map (contact ↔ contact edges) ─────────────────────────────────
