@@ -22,6 +22,13 @@ const AUTOSAVE_DELAY_MS = 1000;
 /** localStorage key remembering the autosave preference across sessions. */
 const AUTOSAVE_KEY = 'wv-autosave';
 
+/** Right-hand links panel: persisted collapse/width and sizing bounds. */
+const BACKLINKS_COLLAPSED_KEY = 'wv-backlinks-collapsed';
+const BACKLINKS_WIDTH_KEY = 'wv-backlinks-width';
+const BACKLINKS_MIN_WIDTH = 180;
+const BACKLINKS_MAX_WIDTH = 520;
+const BACKLINKS_DEFAULT_WIDTH = 240;
+
 const THEMES: ThemeId[] = ['system', 'light', 'dark', 'high-contrast'];
 
 function resolveTheme(theme: ThemeId): ThemeId {
@@ -53,6 +60,23 @@ export function App(): JSX.Element {
   const [locale, setLocaleState] = useState<Locale>(() => getLocale());
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [backlinksCollapsed, setBacklinksCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(BACKLINKS_COLLAPSED_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const [backlinksWidth, setBacklinksWidth] = useState<number>(() => {
+    try {
+      const n = parseInt(localStorage.getItem(BACKLINKS_WIDTH_KEY) ?? '', 10);
+      return Number.isFinite(n)
+        ? Math.min(BACKLINKS_MAX_WIDTH, Math.max(BACKLINKS_MIN_WIDTH, n))
+        : BACKLINKS_DEFAULT_WIDTH;
+    } catch {
+      return BACKLINKS_DEFAULT_WIDTH;
+    }
+  });
   // Selected client slug for the filter (empty = whole wiki). Drives the file
   // tree, the page graph and the contacts graph together.
   const [clientFilter, setClientFilter] = useState<string>('');
@@ -335,6 +359,60 @@ export function App(): JSX.Element {
       document.removeEventListener('keydown', onKeyDown);
     };
   }, [shareMenuOpen]);
+
+  // Persist the links-panel collapse/width preferences across sessions.
+  useEffect(() => {
+    try {
+      localStorage.setItem(BACKLINKS_COLLAPSED_KEY, backlinksCollapsed ? '1' : '0');
+    } catch {
+      /* ignore quota/private-mode errors */
+    }
+  }, [backlinksCollapsed]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(BACKLINKS_WIDTH_KEY, String(backlinksWidth));
+    } catch {
+      /* ignore quota/private-mode errors */
+    }
+  }, [backlinksWidth]);
+
+  // Drag the divider to resize the links panel (pointer capture on the divider).
+  // The panel is on the right, so dragging left widens it.
+  const startBacklinksResize = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>): void => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startWidth = backlinksWidth;
+      const onMove = (ev: PointerEvent): void => {
+        const next = Math.min(
+          BACKLINKS_MAX_WIDTH,
+          Math.max(BACKLINKS_MIN_WIDTH, startWidth + (startX - ev.clientX)),
+        );
+        setBacklinksWidth(next);
+      };
+      const onUp = (): void => {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        document.body.style.userSelect = '';
+      };
+      document.body.style.userSelect = 'none';
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    },
+    [backlinksWidth],
+  );
+
+  // Keyboard resizing for accessibility (arrow keys on the focused divider).
+  const onBacklinksResizeKey = useCallback((e: React.KeyboardEvent<HTMLDivElement>): void => {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      setBacklinksWidth((w) => Math.min(BACKLINKS_MAX_WIDTH, w + 16));
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      setBacklinksWidth((w) => Math.max(BACKLINKS_MIN_WIDTH, w - 16));
+    }
+  }, []);
 
   // Ctrl/Cmd+S saves the current page.
   useEffect(() => {
@@ -700,7 +778,48 @@ export function App(): JSX.Element {
                 )}
               </div>
               {activePath && view === 'read' && !isExcalidraw && (
-                <Backlinks model={model} activePath={activePath} onNavigate={openPath} />
+                backlinksCollapsed ? (
+                  <button
+                    type="button"
+                    className="wv-backlinks-expand"
+                    onClick={() => setBacklinksCollapsed(false)}
+                    title={t('backlinks.expand')}
+                    aria-label={t('backlinks.expand')}
+                  >
+                    <svg className="markdit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="m15 18-6-6 6-6" />
+                    </svg>
+                  </button>
+                ) : (
+                  <div className="wv-backlinks-wrap" style={{ flexBasis: `${backlinksWidth}px` }}>
+                    <div
+                      className="wv-backlinks-resizer"
+                      role="separator"
+                      aria-orientation="vertical"
+                      tabIndex={0}
+                      onPointerDown={startBacklinksResize}
+                      onKeyDown={onBacklinksResizeKey}
+                      title={t('backlinks.resize')}
+                      aria-label={t('backlinks.resize')}
+                    />
+                    <div className="wv-backlinks-panel">
+                      <div className="wv-backlinks-toolbar">
+                        <button
+                          type="button"
+                          className="markdit-icon-button"
+                          onClick={() => setBacklinksCollapsed(true)}
+                          title={t('backlinks.collapse')}
+                          aria-label={t('backlinks.collapse')}
+                        >
+                          <svg className="markdit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="m9 18 6-6-6-6" />
+                          </svg>
+                        </button>
+                      </div>
+                      <Backlinks model={model} activePath={activePath} onNavigate={openPath} />
+                    </div>
+                  </div>
+                )
               )}
             </div>
           )}
