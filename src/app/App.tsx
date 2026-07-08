@@ -293,11 +293,13 @@ export function App(): JSX.Element {
     const filename = activeFile.name.toLowerCase().endsWith('.md')
       ? activeFile.name
       : `${activeFile.name}.md`;
+    const subject = activeFile.title ?? filename;
+    const mailBody = t('share.mailBody', { name: filename });
 
     if (window.desktop?.shareByEmail) {
       setShareStatus('sharing');
       try {
-        const res = await window.desktop.shareByEmail({ filename, content });
+        const res = await window.desktop.shareByEmail({ filename, content, subject, body: mailBody });
         setShareStatus(res.ok ? 'idle' : 'failed');
       } catch {
         setShareStatus('failed');
@@ -316,8 +318,6 @@ export function App(): JSX.Element {
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
-      const subject = activeFile.title ?? filename;
-      const mailBody = t('share.mailBody', { name: filename });
       window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mailBody)}`;
     } catch {
       setShareStatus('failed');
