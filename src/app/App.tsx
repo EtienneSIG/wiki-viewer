@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Reader } from '../components/reader/Reader';
 import { ExcalidrawView } from '../components/reader/ExcalidrawView';
 import { Editor } from '../components/editor/Editor';
@@ -60,6 +60,9 @@ export function App(): JSX.Element {
   const [indexing, setIndexing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  const [shareStatus, setShareStatus] = useState<'idle' | 'sharing' | 'failed'>('idle');
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
+  const shareMenuRef = useRef<HTMLDivElement | null>(null);
   const [autosave, setAutosave] = useState<boolean>(() => {
     try {
       return localStorage.getItem(AUTOSAVE_KEY) !== '0';
@@ -257,6 +260,82 @@ export function App(): JSX.Element {
     window.setTimeout(() => setSaveStatus('idle'), 2500);
   }, [model, activePath, frontmatterRaw, body]);
 
+  // Share the current page by email. On the desktop build this attaches the
+  // Markdown file to a new Outlook message; in the browser it downloads the
+  // file and opens a pre-filled mailto (attachments can't be set from a URL).
+  const handleShareEmail = useCallback(async (): Promise<void> => {
+    if (!activeFile || isExcalidraw) return;
+    const content = joinFrontmatter(frontmatterRaw, body);
+    const filename = activeFile.name.toLowerCase().endsWith('.md')
+      ? activeFile.name
+      : `${activeFile.name}.md`;
+
+    if (window.desktop?.shareByEmail) {
+      setShareStatus('sharing');
+      try {
+        const res = await window.desktop.shareByEmail({ filename, content });
+        setShareStatus(res.ok ? 'idle' : 'failed');
+      } catch {
+        setShareStatus('failed');
+      }
+      window.setTimeout(() => setShareStatus('idle'), 2500);
+      return;
+    }
+
+    // Browser fallback: download the Markdown so the user can attach it, then
+    // open a pre-filled email.
+    try {
+      const blob = new Blob([content], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      const subject = activeFile.title ?? filename;
+      const mailBody = t('share.mailBody', { name: filename });
+      window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mailBody)}`;
+    } catch {
+      setShareStatus('failed');
+      window.setTimeout(() => setShareStatus('idle'), 2500);
+    }
+  }, [activeFile, isExcalidraw, frontmatterRaw, body]);
+
+  // Download the current page as a Markdown file.
+  const handleDownload = useCallback((): void => {
+    if (!activeFile || isExcalidraw) return;
+    const content = joinFrontmatter(frontmatterRaw, body);
+    const filename = activeFile.name.toLowerCase().endsWith('.md')
+      ? activeFile.name
+      : `${activeFile.name}.md`;
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [activeFile, isExcalidraw, frontmatterRaw, body]);
+
+  // Close the share menu on outside click or Escape.
+  useEffect(() => {
+    if (!shareMenuOpen) return;
+    const onPointerDown = (e: MouseEvent): void => {
+      if (shareMenuRef.current && !shareMenuRef.current.contains(e.target as Node)) {
+        setShareMenuOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setShareMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [shareMenuOpen]);
+
   // Ctrl/Cmd+S saves the current page.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
@@ -408,6 +487,67 @@ export function App(): JSX.Element {
               </svg>
               {t('action.autosave')}
             </button>
+          )}
+          {model && (
+            <div className="wv-share" ref={shareMenuRef}>
+              <button
+                type="button"
+                className="wv-share-toggle"
+                onClick={() => setShareMenuOpen((v) => !v)}
+                disabled={!activeFile || isExcalidraw || shareStatus === 'sharing'}
+                aria-haspopup="menu"
+                aria-expanded={shareMenuOpen}
+                title={t('share.title')}
+              >
+                <svg className="markdit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="18" cy="5" r="3" />
+                  <circle cx="6" cy="12" r="3" />
+                  <circle cx="18" cy="19" r="3" />
+                  <path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4" />
+                </svg>
+                {shareStatus === 'sharing'
+                  ? t('share.sharing')
+                  : shareStatus === 'failed'
+                    ? t('share.failed')
+                    : t('share.title')}
+                <svg className="markdit-icon wv-share-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              {shareMenuOpen && (
+                <div className="wv-share-menu" role="menu">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setShareMenuOpen(false);
+                      void handleShareEmail();
+                    }}
+                  >
+                    <svg className="markdit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="3" y="5" width="18" height="14" rx="2" />
+                      <path d="m3 7 9 6 9-6" />
+                    </svg>
+                    {t('share.email')}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setShareMenuOpen(false);
+                      handleDownload();
+                    }}
+                  >
+                    <svg className="markdit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12 3v12" />
+                      <path d="m7 10 5 5 5-5" />
+                      <path d="M5 21h14" />
+                    </svg>
+                    {t('share.download')}
+                  </button>
+                </div>
+              )}
+            </div>
           )}
           {model && (
             <button type="button" onClick={handleSave} disabled={!activeFile || isExcalidraw || saveStatus === 'saving'} title={t('action.save')}>

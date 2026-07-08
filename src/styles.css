@@ -262,6 +262,39 @@ body {
   flex-shrink: 0;
 }
 
+/* Share dropdown (email / download) */
+.wv-share {
+  position: relative;
+  display: inline-flex;
+}
+
+.wv-share-caret {
+  width: 14px;
+  height: 14px;
+  opacity: 0.75;
+}
+
+.wv-share-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 60;
+  min-width: 210px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.3rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+}
+
+.wv-share-menu button {
+  justify-content: flex-start;
+  width: 100%;
+}
+
 /* Visible focus indicator (WCAG 2.2 AA — 2.4.11/2.4.13). */
 button:focus-visible,
 a:focus-visible,

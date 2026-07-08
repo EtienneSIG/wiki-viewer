@@ -9,6 +9,12 @@ interface Window {
   desktop?: {
     isElectron: boolean;
     platform: string;
+    shareByEmail?: (payload: { filename: string; content: string }) => Promise<{
+      ok: boolean;
+      filePath?: string;
+      method?: string;
+      error?: string;
+    }>;
   };
 }
 
