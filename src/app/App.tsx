@@ -30,6 +30,7 @@ const BACKLINKS_MAX_WIDTH = 520;
 const BACKLINKS_DEFAULT_WIDTH = 240;
 
 const THEMES: ThemeId[] = ['system', 'light', 'dark', 'high-contrast'];
+const CURRENT_CLIENTS = ['axa', 'bnp'];
 
 function resolveTheme(theme: ThemeId): ThemeId {
   if (theme !== 'system') return theme;
@@ -80,6 +81,7 @@ export function App(): JSX.Element {
   // Selected client slug for the filter (empty = whole wiki). Drives the file
   // tree, the page graph and the contacts graph together.
   const [clientFilter, setClientFilter] = useState<string>('');
+  const [currentClientsOnly, setCurrentClientsOnly] = useState(false);
   const [loading, setLoading] = useState(false);
   const [indexing, setIndexing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -103,15 +105,19 @@ export function App(): JSX.Element {
   // page. Rebuilt whenever the model changes (i.e. after background indexing
   // populates page contents).
   const contacts = useMemo(() => (model ? buildContactsGraph(model) : null), [model]);
+  const activeClientFilters = useMemo(() => {
+    if (!model) return [];
+    if (currentClientsOnly) return CURRENT_CLIENTS.filter((c) => model.clients.includes(c));
+    return clientFilter && model.clients.includes(clientFilter) ? [clientFilter] : [];
+  }, [model, currentClientsOnly, clientFilter]);
 
   // Sidebar file tree, optionally restricted to the selected client. A stale
   // selection (e.g. after opening another wiki) is ignored, and an empty
   // selection shows the full tree.
   const treeNodes = useMemo(() => {
     if (!model) return [];
-    const active = clientFilter && model.clients.includes(clientFilter) ? clientFilter : '';
-    return active ? buildClientTree(model.files, [active]) : model.tree;
-  }, [model, clientFilter]);
+    return activeClientFilters.length > 0 ? buildClientTree(model.files, activeClientFilters) : model.tree;
+  }, [model, activeClientFilters]);
 
   // Resolve a root-relative asset path (e.g. an image referenced from Markdown)
   // to an object URL, reading it from the opened folder. Stays offline-first.
@@ -693,6 +699,7 @@ export function App(): JSX.Element {
                   id="wv-client-filter"
                   className="wv-sidebar-filter-select"
                   value={clientFilter}
+                  disabled={currentClientsOnly}
                   onChange={(e) => setClientFilter(e.target.value)}
                 >
                   <option value="">{t('sidebar.allClients')}</option>
@@ -702,6 +709,14 @@ export function App(): JSX.Element {
                     </option>
                   ))}
                 </select>
+                <label className="wv-sidebar-filter-check">
+                  <input
+                    type="checkbox"
+                    checked={currentClientsOnly}
+                    onChange={(e) => setCurrentClientsOnly(e.target.checked)}
+                  />
+                  {t('sidebar.currentClientsOnly')}
+                </label>
               </div>
             )}
           </aside>
@@ -718,7 +733,7 @@ export function App(): JSX.Element {
                 </div>
               </div>
             ) : (
-              <GraphView graph={model.graph} activePath={activePath} onOpen={openPath} theme={resolvedTheme} clientFilter={clientFilter} />
+              <GraphView graph={model.graph} activePath={activePath} onOpen={openPath} theme={resolvedTheme} clientFilters={activeClientFilters} />
             )
           ) : view === 'contacts' ? (
             contacts && contacts.contactCount > 0 ? (
@@ -728,7 +743,7 @@ export function App(): JSX.Element {
                 onOpen={openContactNode}
                 theme={resolvedTheme}
                 searchPlaceholder={t('contacts.search')}
-                clientFilter={clientFilter}
+                clientFilters={activeClientFilters}
                 initialShowLabels
               />
             ) : (
@@ -826,7 +841,7 @@ export function App(): JSX.Element {
         </main>
       </div>
       {model && searchOpen && (
-        <SearchPanel model={model} onNavigate={openPath} onClose={() => setSearchOpen(false)} />
+        <SearchPanel model={model} onNavigate={openPath} onClose={() => setSearchOpen(false)} clientFilters={activeClientFilters} />
       )}
       <StatusBar />
     </div>

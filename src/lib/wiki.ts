@@ -342,7 +342,8 @@ export function buildModel(rootName: string, files: WikiFile[]): WikiModel {
   // A client is a page under the `clients` category; its slug is the client id
   // (e.g. alstom, michelin). A page belongs to a client when it IS that client
   // page, when one of its tags matches a client slug, or when its filename is
-  // prefixed with `<client>-` (the project naming convention).
+  // prefixed with `<client>-` (the project naming convention), or when it lives
+  // under a client-named folder such as `projects/axa/...`.
   const clientSlugs = new Set<string>();
   for (const f of files) {
     if (f.category.toLowerCase() === 'clients' && !f.slug.startsWith('_')) {
@@ -359,6 +360,7 @@ export function buildModel(rootName: string, files: WikiFile[]): WikiModel {
     }
     for (const client of clientSlugs) {
       if (slug.startsWith(`${client}-`)) found.add(client);
+      if (f.path.toLowerCase().split('/').includes(client)) found.add(client);
     }
     return [...found];
   };

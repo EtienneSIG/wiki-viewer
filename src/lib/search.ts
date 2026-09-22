@@ -76,15 +76,22 @@ function highlight(text: string, terms: string[]): SearchSegment[] {
  * only returned when it matches every term (AND). Results are ordered by
  * relevance (title matches first) and capped at `limit`.
  */
-export function searchWiki(model: WikiModel, query: string, limit = 40): SearchResult[] {
+export function searchWiki(
+  model: WikiModel,
+  query: string,
+  limit = 40,
+  clientFilters: string[] = [],
+): SearchResult[] {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return [];
   const terms = Array.from(new Set(normalized.split(/\s+/).filter(Boolean)));
+  const clientSet = new Set(clientFilters.map((c) => c.toLowerCase()));
 
   const results: SearchResult[] = [];
   for (const file of model.files) {
     // Skip underscore-prefixed stub/meta pages (hidden like in tree + graph).
     if (isUnderscoreHidden(file.path)) continue;
+    if (clientSet.size > 0 && !file.clients.some((c) => clientSet.has(c))) continue;
     const title = file.title || file.slug;
     const titleLower = title.toLowerCase();
     const pathLower = file.path.toLowerCase();

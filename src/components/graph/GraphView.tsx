@@ -20,9 +20,9 @@ export interface GraphViewProps {
   theme: ThemeId;
   /** Placeholder for the search box (defaults to "Rechercher une page…"). */
   searchPlaceholder?: string;
-  /** Client slug to restrict the graph to (empty = no restriction). Driven by
+  /** Client slugs to restrict the graph to (empty = no restriction). Driven by
    *  the sidebar filter so wiki, graph and contacts stay in sync. */
-  clientFilter?: string;
+  clientFilters?: string[];
   /** Show node labels by default (used by the contacts graph). */
   initialShowLabels?: boolean;
 }
@@ -76,6 +76,39 @@ function radiusOf(node: GNode): number {
   return Math.min(22, 4 + Math.sqrt(node.degree) * 2.2);
 }
 
+function hierarchyTier(node: GNode): number {
+  if (node.id.startsWith('account:')) return 0;
+  const text = `${node.label} ${node.title ?? ''}`.toLowerCase();
+  if (/(chief|cdo|cio|cto|ciso|cdio|executive|svp|vp|directeur|décideur|decideur)/.test(text)) return 1;
+  if (/(head|director|directeur|manager|mgr|lead|responsable|owner|product)/.test(text)) return 2;
+  if (/(architect|architecte|engineer|ingénieur|ingenieur|analyst|analyste|specialist|consultant)/.test(text)) return 3;
+  return 4;
+}
+
+function applyHierarchyLayout(nodes: GNode[], width: number, height: number): void {
+  const groups = [...new Set(nodes.map((n) => n.group))].sort((a, b) => a.localeCompare(b));
+  const byGroup = new Map(groups.map((g) => [g, nodes.filter((n) => n.group === g)]));
+  const colWidth = width / Math.max(1, groups.length);
+  const rowY = [72, height * 0.24, height * 0.43, height * 0.62, height * 0.8];
+
+  groups.forEach((group, groupIndex) => {
+    const groupNodes = byGroup.get(group) ?? [];
+    const left = groupIndex * colWidth;
+    for (let tier = 0; tier <= 4; tier++) {
+      const tierNodes = groupNodes.filter((n) => hierarchyTier(n) === tier);
+      tierNodes.forEach((node, i) => {
+        const slot = (i + 1) / (tierNodes.length + 1);
+        node.x = left + slot * colWidth;
+        node.y = rowY[tier];
+        node.fx = node.x;
+        node.fy = node.y;
+        node.vx = 0;
+        node.vy = 0;
+      });
+    }
+  });
+}
+
 interface Palettes {
   fg: string;
   faint: string;
@@ -120,7 +153,7 @@ function themeColors(theme: ThemeId): Palettes {
  * Pan (drag background), zoom (wheel), drag nodes, hover to highlight neighbors,
  * click a node to open the page. Search dims non-matches; orphans can be hidden.
  */
-export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder, clientFilter = '', initialShowLabels = false }: GraphViewProps): JSX.Element {
+export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder, clientFilters = [], initialShowLabels = false }: GraphViewProps): JSX.Element {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -145,6 +178,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
   const [showLabels, setShowLabels] = useState(initialShowLabels);
   const [linkMode, setLinkMode] = useState<'all' | 'classic' | 'influence'>('all');
   const [showCooccurrence, setShowCooccurrence] = useState(false);
+  const [hierarchyView, setHierarchyView] = useState(false);
   const [spacing, setSpacing] = useState(1.4);
   const spacingRef = useRef(1.4);
   const [legend, setLegend] = useState<{ group: string; color: string }[]>([]);
@@ -160,6 +194,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
   const hasStance = graph.nodes.some(
     (n) => n.stance === 'sponsor' || n.stance === 'detractor' || n.advisor,
   );
+  const isContactsGraph = graph.nodes.some((n) => n.id.startsWith('account:') || n.id.startsWith('contact:'));
 
   // Keep style refs in sync and repaint when purely visual state changes.
   useEffect(() => {
@@ -217,11 +252,12 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
       .map((n) => ({ id: n.id, label: n.label, group: n.group, degree: n.degree, clients: n.clients, title: n.title, stance: n.stance, advisor: n.advisor }));
 
     // "Filtre par client" (piloté par le menu de la sidebar) : ne conserve que
-    // les nœuds rattachés au client sélectionné — filtrage strict, sans halo de
+    // les nœuds rattachés aux clients sélectionnés — filtrage strict, sans halo de
     // voisins, pour que la sélection isole vraiment le compte/le client.
-    if (clientFilter) {
+    const clientSet = new Set(clientFilters.map((c) => c.toLowerCase()));
+    if (clientSet.size > 0) {
       for (let i = nodes.length - 1; i >= 0; i--) {
-        if (!nodes[i].clients.includes(clientFilter)) nodes.splice(i, 1);
+        if (!nodes[i].clients.some((c) => clientSet.has(c))) nodes.splice(i, 1);
       }
     }
 
@@ -248,6 +284,10 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
       adj.get(l.target as string)?.add(l.source as string);
     }
     const colors = paletteFor(nodes.map((n) => n.group));
+    const { w, h } = dimsRef.current;
+    if (hierarchyView && isContactsGraph) {
+      applyHierarchyLayout(nodes, w, h);
+    }
 
     nodesRef.current = nodes;
     nodeByIdRef.current = nodeById;
@@ -255,7 +295,6 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
     colorRef.current = colors;
     setLegend([...colors].map(([group, color]) => ({ group, color })));
 
-    const { w, h } = dimsRef.current;
     const s = spacingRef.current;
     const sim = forceSimulation<GNode>(nodes)
       .force(
@@ -265,7 +304,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
           .distance(90 * s)
           .strength(0.35),
       )
-      .force('charge', forceManyBody<GNode>().strength(-260 * s).distanceMax(600))
+      .force('charge', forceManyBody<GNode>().strength(hierarchyView ? -40 : -260 * s).distanceMax(600))
       .force('center', forceCenter(w / 2, h / 2))
       .force('collide', forceCollide<GNode>((d) => radiusOf(d) + 10 * s))
       .on('tick', () => drawRef.current());
@@ -280,7 +319,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
     return () => {
       sim.stop();
     };
-  }, [graph, showOrphans, clientFilter, linkMode, showCooccurrence, focusActive]);
+  }, [graph, showOrphans, clientFilters, linkMode, showCooccurrence, hierarchyView, isContactsGraph, focusActive]);
 
   // Canvas sizing (device-pixel-ratio aware) + resize handling.
   useEffect(() => {
@@ -665,6 +704,16 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
               onChange={(e) => setShowCooccurrence(e.target.checked)}
             />
             {t('graph.cooccurrence')}
+          </label>
+        )}
+        {isContactsGraph && (
+          <label className="wv-graph-toggle">
+            <input
+              type="checkbox"
+              checked={hierarchyView}
+              onChange={(e) => setHierarchyView(e.target.checked)}
+            />
+            {t('graph.hierarchy')}
           </label>
         )}
         <label className="wv-graph-slider">

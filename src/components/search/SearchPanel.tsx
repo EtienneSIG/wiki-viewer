@@ -7,6 +7,7 @@ export interface SearchPanelProps {
   model: WikiModel;
   onNavigate: (path: string) => void;
   onClose: () => void;
+  clientFilters?: string[];
 }
 
 function renderSegments(segments: SearchSegment[]): JSX.Element[] {
@@ -16,13 +17,13 @@ function renderSegments(segments: SearchSegment[]): JSX.Element[] {
 }
 
 /** Command-palette style full-text search over the open wiki. */
-export function SearchPanel({ model, onNavigate, onClose }: SearchPanelProps): JSX.Element {
+export function SearchPanel({ model, onNavigate, onClose, clientFilters = [] }: SearchPanelProps): JSX.Element {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
-  const results = useMemo(() => searchWiki(model, query), [model, query]);
+  const results = useMemo(() => searchWiki(model, query, 40, clientFilters), [model, query, clientFilters]);
 
   useEffect(() => {
     inputRef.current?.focus();
