@@ -85,28 +85,73 @@ function hierarchyTier(node: GNode): number {
   return 4;
 }
 
-function applyHierarchyLayout(nodes: GNode[], width: number, height: number): void {
+function applyHierarchyLayout(nodes: GNode[], width: number, spacing = 1): void {
   const groups = [...new Set(nodes.map((n) => n.group))].sort((a, b) => a.localeCompare(b));
   const byGroup = new Map(groups.map((g) => [g, nodes.filter((n) => n.group === g)]));
-  const colWidth = width / Math.max(1, groups.length);
-  const rowY = [72, height * 0.24, height * 0.43, height * 0.62, height * 0.8];
+  const nodeGap = 120 * spacing;
+  const groupGap = 96 * spacing;
+  const maxColumns = groups.length === 1 ? 6 : 4;
+  const groupWidths = groups.map((group) => {
+    const groupNodes = byGroup.get(group) ?? [];
+    const widestTier = Math.max(
+      1,
+      ...Array.from({ length: 5 }, (_, tier) => (
+        groupNodes.filter((node) => hierarchyTier(node) === tier).length
+      )),
+    );
+    const columns = Math.min(maxColumns, widestTier);
+    return Math.max(260 * spacing, (columns - 1) * nodeGap + 120 * spacing);
+  });
+  const totalWidth = groupWidths.reduce((sum, groupWidth) => sum + groupWidth, 0)
+    + Math.max(0, groups.length - 1) * groupGap;
+  const rowGap = 105 * spacing;
+  const startX = Math.max(0, (width - totalWidth) / 2);
+  let groupLeft = startX;
 
   groups.forEach((group, groupIndex) => {
     const groupNodes = byGroup.get(group) ?? [];
-    const left = groupIndex * colWidth;
+    const groupWidth = groupWidths[groupIndex];
+    const centerX = groupLeft + groupWidth / 2;
+    let tierTop = 72;
     for (let tier = 0; tier <= 4; tier++) {
       const tierNodes = groupNodes.filter((n) => hierarchyTier(n) === tier);
+      const columns = Math.min(maxColumns, Math.max(1, tierNodes.length));
       tierNodes.forEach((node, i) => {
-        const slot = (i + 1) / (tierNodes.length + 1);
-        node.x = left + slot * colWidth;
-        node.y = rowY[tier];
+        const row = Math.floor(i / columns);
+        const column = i % columns;
+        const nodesInRow = Math.min(columns, tierNodes.length - row * columns);
+        node.x = centerX + (column - (nodesInRow - 1) / 2) * nodeGap;
+        node.y = tierTop + row * rowGap;
         node.fx = node.x;
         node.fy = node.y;
         node.vx = 0;
         node.vy = 0;
       });
+      tierTop += Math.max(1, Math.ceil(tierNodes.length / columns)) * rowGap;
     }
+    groupLeft += groupWidth + groupGap;
   });
+}
+
+function fitHierarchyLayout(nodes: GNode[], width: number, height: number): Transform {
+  const xs = nodes.map((node) => node.x ?? 0);
+  const ys = nodes.map((node) => node.y ?? 0);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const padding = 56;
+  const fitScale = Math.min(
+    1,
+    (width - padding * 2) / Math.max(1, maxX - minX),
+    (height - padding * 2) / Math.max(1, maxY - minY),
+  );
+  const k = Math.max(0.08, fitScale);
+  return {
+    k,
+    x: width / 2 - ((minX + maxX) / 2) * k,
+    y: height / 2 - ((minY + maxY) / 2) * k,
+  };
 }
 
 interface Palettes {
@@ -286,7 +331,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
     const colors = paletteFor(nodes.map((n) => n.group));
     const { w, h } = dimsRef.current;
     if (hierarchyView && isContactsGraph) {
-      applyHierarchyLayout(nodes, w, h);
+      applyHierarchyLayout(nodes, w, spacingRef.current);
     }
 
     nodesRef.current = nodes;
@@ -628,6 +673,13 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
     const nodes = nodesRef.current;
     if (!sim || nodes.length === 0) return;
     const { w, h } = dimsRef.current;
+    if (hierarchyView && isContactsGraph) {
+      applyHierarchyLayout(nodes, w, spacingRef.current);
+      transformRef.current = fitHierarchyLayout(nodes, w, h);
+      sim.alpha(0).stop();
+      drawRef.current();
+      return;
+    }
     const cx = w / 2;
     const cy = h / 2;
     const radius = Math.max(120, Math.min(w, h) * 0.42) * spacingRef.current;
@@ -649,7 +701,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
       drawRef.current();
     }, 600);
     drawRef.current();
-  }, [focusActive]);
+  }, [focusActive, hierarchyView, isContactsGraph]);
 
   return (
     <div className="wv-graph" ref={wrapRef}>
