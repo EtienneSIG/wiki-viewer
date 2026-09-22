@@ -72,7 +72,8 @@ and marks **sponsors / detractors** and **trusted advisors**.
   reorganizable pyramids driven by the directory's potential N+1 field, with
   each N+1 centered above their direct team, role-based fallback and hover
   details when the N+1 is not provided. Manual node moves remain fixed in this
-  view, and reorganizing separates adjacent reporting trees.
+  view, reorganizing separates adjacent reporting trees, and labels use
+  collision-free lanes instead of overlapping at low zoom.
 - **MEDDPICC status markers** — renders red, orange, green or gray status dots in
   MEDDPICC review tables while keeping the Markdown source unchanged.
 - **`[[wikilinks]]`** — `[[target]]` and `[[target|alias]]` links become

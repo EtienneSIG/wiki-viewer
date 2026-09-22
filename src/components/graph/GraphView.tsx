@@ -537,7 +537,17 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
       ctx.setLineDash([]);
 
       // Nodes.
-      for (const n of nodes) {
+      const labelBoxes: Array<{ left: number; right: number; top: number; bottom: number }> = [];
+      const orderedNodes = [...nodes].sort((a, b) => {
+        const priority = (node: GNode): number => (
+          node.id === focusId ? 0
+            : node.id.startsWith('account:') ? 1
+              : node.id.startsWith('entity:') ? 2
+                : 3
+        );
+        return priority(a) - priority(b);
+      });
+      for (const n of orderedNodes) {
         if (n.x == null || n.y == null) continue;
         const r = radiusOf(n);
         const matched = query ? n.label.toLowerCase().includes(query) : true;
@@ -587,14 +597,40 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
           ctx.textAlign = 'center';
           ctx.textBaseline = 'top';
           const label = n.label.length > 34 ? `${n.label.slice(0, 33)}…` : n.label;
-          ctx.fillText(label, n.x, n.y + r + 2 / k);
+          const labelWidth = ctx.measureText(label).width;
+          const labelHeight = 12 / k;
+          const baseY = n.y + r + 2 / k;
+          const lanes = [0, 14, 28, 42, -20, -34].map((offset) => offset / k);
+          const lane = lanes.find((offset) => {
+            const box = {
+              left: n.x! - labelWidth / 2 - 2 / k,
+              right: n.x! + labelWidth / 2 + 2 / k,
+              top: baseY + offset,
+              bottom: baseY + offset + labelHeight,
+            };
+            return !labelBoxes.some((existing) => (
+              box.left < existing.right
+              && box.right > existing.left
+              && box.top < existing.bottom
+              && box.bottom > existing.top
+            ));
+          });
+          if (lane == null && n.id !== focusId) continue;
+          const labelY = baseY + (lane ?? 0);
+          labelBoxes.push({
+            left: n.x - labelWidth / 2 - 2 / k,
+            right: n.x + labelWidth / 2 + 2 / k,
+            top: labelY,
+            bottom: labelY + labelHeight,
+          });
+          ctx.fillText(label, n.x, labelY);
           // Secondary line (e.g. a contact's job title), only when focused.
           if (n.title && (n.id === focusId || k > 2)) {
             ctx.font = `${9 / k}px "Segoe UI", sans-serif`;
             ctx.fillStyle = c.fg;
             ctx.globalAlpha = dim ? 0.14 : 0.7;
             const sub = n.title.length > 40 ? `${n.title.slice(0, 39)}…` : n.title;
-            ctx.fillText(sub, n.x, n.y + r + 2 / k + 13 / k);
+            ctx.fillText(sub, n.x, labelY + 13 / k);
           }
         }
         ctx.globalAlpha = 1;
