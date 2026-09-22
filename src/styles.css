@@ -552,6 +552,10 @@ a:focus-visible,
 
 .wv-sidebar-filter-select {
   width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   padding: 0.32rem 0.5rem;
   font-size: 0.82rem;
   color: var(--fg);
@@ -570,6 +574,65 @@ a:focus-visible,
   outline: none;
   border-color: var(--accent-text);
   box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.wv-client-multiselect {
+  position: relative;
+}
+
+.wv-client-multiselect summary {
+  list-style: none;
+}
+
+.wv-client-multiselect summary::-webkit-details-marker {
+  display: none;
+}
+
+.wv-client-filter-caret {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  transition: transform 0.12s ease;
+}
+
+.wv-client-multiselect[open] .wv-client-filter-caret {
+  transform: rotate(180deg);
+}
+
+.wv-client-options {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 0.3rem);
+  z-index: 30;
+  max-height: 15rem;
+  overflow-y: auto;
+  padding: 0.3rem;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+}
+
+.wv-client-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.wv-client-option:hover {
+  background: var(--surface-hover);
+}
+
+.wv-client-option input {
+  margin: 0;
+  accent-color: var(--accent);
 }
 
 .markdit-sidebar-error {

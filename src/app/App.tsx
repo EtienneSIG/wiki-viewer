@@ -79,10 +79,9 @@ export function App(): JSX.Element {
       return BACKLINKS_DEFAULT_WIDTH;
     }
   });
-  // Selected client slug for the filter (empty = whole wiki). Drives the file
-  // tree, the page graph and the contacts graph together.
-  const [clientFilter, setClientFilter] = useState<string>('');
-  const [currentClientsOnly, setCurrentClientsOnly] = useState(false);
+  // Selected client slugs for the shared tree, graph and search filter. AXA and
+  // BNP are the current accounts selected by default; an empty list means all.
+  const [selectedClients, setSelectedClients] = useState<string[]>(CURRENT_CLIENTS);
   const [loading, setLoading] = useState(false);
   const [indexing, setIndexing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,9 +107,13 @@ export function App(): JSX.Element {
   const contacts = useMemo(() => (model ? buildContactsGraph(model) : null), [model]);
   const activeClientFilters = useMemo(() => {
     if (!model) return [];
-    if (currentClientsOnly) return CURRENT_CLIENTS.filter((c) => model.clients.includes(c));
-    return clientFilter && model.clients.includes(clientFilter) ? [clientFilter] : [];
-  }, [model, currentClientsOnly, clientFilter]);
+    return selectedClients.filter((client) => model.clients.includes(client));
+  }, [model, selectedClients]);
+  const clientFilterLabel = activeClientFilters.length === 0
+    ? t('sidebar.allClients')
+    : activeClientFilters.length <= 2
+      ? activeClientFilters.map((client) => client.charAt(0).toUpperCase() + client.slice(1)).join(', ')
+      : t('sidebar.clientsSelected', { count: activeClientFilters.length });
 
   // Sidebar file tree, optionally restricted to the selected client. A stale
   // selection (e.g. after opening another wiki) is ignored, and an empty
@@ -698,31 +701,41 @@ export function App(): JSX.Element {
             </div>
             {model.clients.length > 0 && (
               <div className="wv-sidebar-filter">
-                <label className="wv-sidebar-filter-title" htmlFor="wv-client-filter">
+                <span className="wv-sidebar-filter-title">
                   {t('sidebar.filterClient')}
-                </label>
-                <select
-                  id="wv-client-filter"
-                  className="wv-sidebar-filter-select"
-                  value={clientFilter}
-                  disabled={currentClientsOnly}
-                  onChange={(e) => setClientFilter(e.target.value)}
-                >
-                  <option value="">{t('sidebar.allClients')}</option>
-                  {model.clients.map((c) => (
-                    <option key={c} value={c}>
-                      {c.charAt(0).toUpperCase() + c.slice(1)}
-                    </option>
-                  ))}
-                </select>
-                <label className="wv-sidebar-filter-check">
-                  <input
-                    type="checkbox"
-                    checked={currentClientsOnly}
-                    onChange={(e) => setCurrentClientsOnly(e.target.checked)}
-                  />
-                  {t('sidebar.currentClientsOnly')}
-                </label>
+                </span>
+                <details className="wv-client-multiselect">
+                  <summary className="wv-sidebar-filter-select">
+                    <span>{clientFilterLabel}</span>
+                    <svg className="markdit-icon wv-client-filter-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </summary>
+                  <div className="wv-client-options" role="group" aria-label={t('sidebar.filterClient')}>
+                    <label className="wv-client-option">
+                      <input
+                        type="checkbox"
+                        checked={activeClientFilters.length === 0}
+                        onChange={() => setSelectedClients([])}
+                      />
+                      <span>{t('sidebar.allClients')}</span>
+                    </label>
+                    {model.clients.map((client) => (
+                      <label className="wv-client-option" key={client}>
+                        <input
+                          type="checkbox"
+                          checked={activeClientFilters.includes(client)}
+                          onChange={(event) => setSelectedClients((selected) => (
+                            event.target.checked
+                              ? [...new Set([...selected, client])]
+                              : selected.filter((value) => value !== client)
+                          ))}
+                        />
+                        <span>{client.charAt(0).toUpperCase() + client.slice(1)}</span>
+                      </label>
+                    ))}
+                  </div>
+                </details>
               </div>
             )}
           </aside>
