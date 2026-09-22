@@ -151,13 +151,35 @@ function applyHierarchyLayout(nodes: GNode[], width: number, spacing = 1): void 
       tierTop += Math.max(1, Math.ceil(tierNodes.length / columns)) * rowGap;
     }
 
+    const shiftSubtree = (root: GNode, deltaX: number): void => {
+      const pending = [root];
+      const shifted = new Set<string>();
+      while (pending.length > 0) {
+        const node = pending.pop()!;
+        if (shifted.has(node.id)) continue;
+        shifted.add(node.id);
+        node.x = (node.x ?? 0) + deltaX;
+        node.fx = node.x;
+        pending.push(...groupNodes.filter((candidate) => candidate.managerId === node.id));
+      }
+    };
+
     for (let tier = maxTier - 1; tier >= 1; tier--) {
-      for (const manager of groupNodes.filter((node) => tierById.get(node.id) === tier)) {
+      const tierNodes = groupNodes.filter((node) => tierById.get(node.id) === tier);
+      for (const manager of tierNodes) {
         const reports = groupNodes.filter((node) => node.managerId === manager.id && node.x != null);
         if (reports.length === 0) continue;
         const reportXs = reports.map((node) => node.x!);
         manager.x = (Math.min(...reportXs) + Math.max(...reportXs)) / 2;
         manager.fx = manager.x;
+      }
+
+      let previousX: number | null = null;
+      for (const node of tierNodes.sort((a, b) => (a.x ?? 0) - (b.x ?? 0))) {
+        if (previousX != null && (node.x ?? 0) - previousX < nodeGap) {
+          shiftSubtree(node, previousX + nodeGap - (node.x ?? 0));
+        }
+        previousX = node.x ?? 0;
       }
     }
     groupLeft += groupWidth + groupGap;
@@ -614,7 +636,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
         mode = 'node';
         dragNode = hit;
         canvas.style.cursor = 'grabbing';
-        simRef.current?.alphaTarget(0.3).restart();
+        if (!(hierarchyView && isContactsGraph)) simRef.current?.alphaTarget(0.3).restart();
       } else {
         mode = 'pan';
         canvas.style.cursor = 'grabbing';
@@ -648,20 +670,25 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
         drawRef.current();
       } else if (mode === 'node' && dragNode) {
         const p = toWorld(e.clientX, e.clientY);
+        dragNode.x = p.x;
+        dragNode.y = p.y;
         dragNode.fx = p.x;
         dragNode.fy = p.y;
-        simRef.current?.alphaTarget(0.3).restart();
+        if (hierarchyView && isContactsGraph) drawRef.current();
+        else simRef.current?.alphaTarget(0.3).restart();
       }
     };
 
     const onPointerUp = (e: PointerEvent): void => {
       if (mode === 'node' && dragNode) {
-        simRef.current?.alphaTarget(0);
+        if (!(hierarchyView && isContactsGraph)) simRef.current?.alphaTarget(0);
         if (moved < 5) {
           onOpen(dragNode.id);
         }
-        dragNode.fx = null;
-        dragNode.fy = null;
+        if (!(hierarchyView && isContactsGraph)) {
+          dragNode.fx = null;
+          dragNode.fy = null;
+        }
       }
       mode = 'none';
       dragNode = null;
@@ -712,7 +739,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
       canvas.removeEventListener('pointerleave', onPointerLeave);
       canvas.removeEventListener('wheel', onWheel);
     };
-  }, [onOpen]);
+  }, [onOpen, hierarchyView, isContactsGraph]);
 
   const resetView = useCallback(() => {
     transformRef.current = { x: 0, y: 0, k: 1 };
