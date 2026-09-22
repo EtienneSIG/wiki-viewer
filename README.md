@@ -39,7 +39,9 @@ and marks **sponsors / detractors** and **trusted advisors**.
 
 - **Open a wiki** — one button, a folder picker (File System Access API), and the
   whole folder is loaded. The last opened folder is reopened on startup.
-- **File tree** — collapsible folder/file navigation, Markdit-style.
+- **File tree** — collapsible folder/file navigation, Markdit-style. The
+  `assets` and `wiki` roots stay visible together, including when client
+  filtering is active.
 - **Reading** — safe Markdown rendering (remark/rehype) with Shiki syntax
   highlighting, exactly like in Markdit.
 - **Editing** — TipTap WYSIWYG editor; Markdown stays the source of truth (no

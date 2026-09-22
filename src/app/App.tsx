@@ -31,7 +31,8 @@ const BACKLINKS_DEFAULT_WIDTH = 240;
 
 const THEMES: ThemeId[] = ['system', 'light', 'dark', 'high-contrast'];
 const CURRENT_CLIENTS = ['axa', 'bnp'];
-const SIDEBAR_ROOTS = new Set(['assets', 'wiki']);
+const SIDEBAR_ROOTS = new Set(['asset', 'assets', 'wiki']);
+const ASSET_ROOTS = new Set(['asset', 'assets']);
 
 function resolveTheme(theme: ThemeId): ThemeId {
   if (theme !== 'system') return theme;
@@ -120,13 +121,20 @@ export function App(): JSX.Element {
   // selection shows the full tree.
   const treeNodes = useMemo(() => {
     if (!model) return [];
-    const tree = activeClientFilters.length > 0
+    const filteredTree = activeClientFilters.length > 0
       ? buildClientTree(model.files, activeClientFilters)
       : model.tree;
-    const preferredRoots = tree.filter(
+    const preferredRoots = filteredTree.filter(
       (node) => node.kind === 'dir' && SIDEBAR_ROOTS.has(node.name.toLowerCase()),
     );
-    return preferredRoots.length > 0 ? preferredRoots : tree;
+    if (activeClientFilters.length > 0) {
+      const assets = model.tree.filter(
+        (node) => node.kind === 'dir' && ASSET_ROOTS.has(node.name.toLowerCase()),
+      );
+      const content = preferredRoots.filter((node) => !ASSET_ROOTS.has(node.name.toLowerCase()));
+      return [...assets, ...content];
+    }
+    return preferredRoots.length > 0 ? preferredRoots : filteredTree;
   }, [model, activeClientFilters]);
 
   // Resolve a root-relative asset path (e.g. an image referenced from Markdown)
