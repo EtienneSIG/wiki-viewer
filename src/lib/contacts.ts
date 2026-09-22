@@ -125,6 +125,14 @@ function parseManagerName(raw: string): string | undefined {
   return cleaned;
 }
 
+function entityLabelFromHeading(raw: string): string {
+  return cleanCell(raw.replace(/`/g, '')).split(/\s+[—–]\s+/)[0].trim();
+}
+
+function entitySlug(label: string): string {
+  return normalizeHeader(label).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
 /**
  * Build the contacts graph. Prefers the per-account directory pages
  * (`contacts-<slug>.md`); each page becomes ONE account hub whose contacts —
@@ -202,8 +210,15 @@ function addContactRows(
 ): number {
   let seq = seqStart;
   let cols: { name: number; title: number; manager: number; advisor: number; stance: number } | null = null;
+  let currentHeading = '';
+  let currentEntityId: string | undefined;
 
   for (const line of lines) {
+    const heading = /^##\s+(.+?)\s*$/.exec(line);
+    if (heading) {
+      currentHeading = entityLabelFromHeading(heading[1]);
+      currentEntityId = undefined;
+    }
     if (!line.trim().startsWith('|')) {
       cols = null; // any non-table line closes the current table.
       continue;
@@ -217,6 +232,21 @@ function addContactRows(
       const norm = cells.map(normalizeHeader);
       const name = norm.findIndex((c) => c === 'nom' || c === 'name');
       if (name === -1) continue; // not a contact table header
+      if (currentHeading && !NON_ACCOUNT_HEADINGS.has(normalizeHeader(currentHeading))) {
+        const entityId = `entity:${account.slug}:${entitySlug(currentHeading)}`;
+        currentEntityId = entityId;
+        if (!nodes.some((node) => node.id === entityId)) {
+          nodes.push({
+            id: entityId,
+            label: currentHeading,
+            group: account.name,
+            degree: 0,
+            clients: [account.slug],
+          });
+          links.push({ source: entityId, target: account.id, kind: 'member' });
+          openTargets.set(entityId, leafPath);
+        }
+      }
       cols = {
         name,
         title: norm.findIndex((c) => c === 'titre' || c === 'title'),
@@ -243,10 +273,15 @@ function addContactRows(
       clients: [account.slug],
       title: title || undefined,
       managerName,
+      entityId: currentEntityId,
       stance,
       advisor: advisor || undefined,
     });
-    links.push({ source: id, target: account.id, kind: 'member' });
+    links.push({ source: id, target: currentEntityId ?? account.id, kind: 'member' });
+    if (currentEntityId) {
+      const entity = nodes.find((node) => node.id === currentEntityId);
+      if (entity) entity.degree += 1;
+    }
     openTargets.set(id, leafPath);
   }
 

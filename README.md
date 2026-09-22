@@ -50,7 +50,9 @@ and marks **sponsors / detractors** and **trusted advisors**.
   open the page.
 - **Contacts graph** — a second graph built from the per-account contact
   directory pages (`contacts-<account>.md`): each account is a hub and every
-  contact a leaf. On top of the account↔contact spokes it adds:
+  directory section becomes a distinct entity hub (for example AXA XL, AXA GO,
+  BNP Paribas Real Estate or BNP Paribas CIB) above its contacts. On top of the
+  structural links it adds:
   - **Influence edges** — inferred contact↔contact relationships parsed from the
     influence map page (`contact-influence-map.md`), drawn dashed/orange.
   - **Co-occurrence edges** — an **optional** empirical layer (toggle) from the

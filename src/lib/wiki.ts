@@ -69,6 +69,8 @@ export interface GraphNode {
   managerName?: string;
   /** Contacts graph only: resolved node id for the potential N+1. */
   managerId?: string;
+  /** Contacts graph only: entity hub this contact belongs to. */
+  entityId?: string;
   /** Contacts graph only: sponsor / detractor stance for the contact. */
   stance?: 'sponsor' | 'detractor' | 'neutral';
   /** Contacts graph only: flagged as a trusted advisor. */

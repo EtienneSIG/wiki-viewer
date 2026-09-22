@@ -36,6 +36,7 @@ interface GNode extends SimulationNodeDatum {
   title?: string;
   managerName?: string;
   managerId?: string;
+  entityId?: string;
   stance?: 'sponsor' | 'detractor' | 'neutral';
   advisor?: boolean;
 }
@@ -75,20 +76,23 @@ function paletteFor(groups: string[]): Map<string, string> {
 }
 
 function radiusOf(node: GNode): number {
+  if (node.id.startsWith('entity:')) return Math.min(18, 8 + Math.sqrt(node.degree) * 2.2);
   return Math.min(22, 4 + Math.sqrt(node.degree) * 2.2);
 }
 
 function roleTier(node: GNode): number {
   if (node.id.startsWith('account:')) return 0;
+  if (node.id.startsWith('entity:')) return 1;
   const text = `${node.label} ${node.title ?? ''}`.toLowerCase();
-  if (/(chief|ceo|cdo|cio|cto|ciso|cdio|executive|svp|vp|directeur|décideur|decideur)/.test(text)) return 1;
-  if (/(head|director|directeur|manager|mgr|lead|responsable|owner|product)/.test(text)) return 2;
-  if (/(architect|architecte|engineer|ingénieur|ingenieur|analyst|analyste|specialist|consultant)/.test(text)) return 3;
-  return 4;
+  if (/(chief|ceo|cdo|cio|cto|ciso|cdio|executive|svp|vp|directeur|décideur|decideur)/.test(text)) return 2;
+  if (/(head|director|directeur|manager|mgr|lead|responsable|owner|product)/.test(text)) return 3;
+  if (/(architect|architecte|engineer|ingénieur|ingenieur|analyst|analyste|specialist|consultant)/.test(text)) return 4;
+  return 5;
 }
 
 function hierarchyTier(node: GNode, nodeById: Map<string, GNode>, seen = new Set<string>()): number {
   if (node.id.startsWith('account:')) return 0;
+  if (node.id.startsWith('entity:')) return 1;
   if (!node.managerId || seen.has(node.id)) return roleTier(node);
   const manager = nodeById.get(node.managerId);
   if (!manager) return roleTier(node);
@@ -160,14 +164,23 @@ function applyHierarchyLayout(nodes: GNode[], width: number, spacing = 1): void 
         shifted.add(node.id);
         node.x = (node.x ?? 0) + deltaX;
         node.fx = node.x;
-        pending.push(...groupNodes.filter((candidate) => candidate.managerId === node.id));
+        pending.push(...groupNodes.filter((candidate) => (
+          candidate.managerId === node.id
+          || (node.id.startsWith('entity:') && candidate.entityId === node.id && !candidate.managerId)
+        )));
       }
     };
 
     for (let tier = maxTier - 1; tier >= 1; tier--) {
       const tierNodes = groupNodes.filter((node) => tierById.get(node.id) === tier);
       for (const manager of tierNodes) {
-        const reports = groupNodes.filter((node) => node.managerId === manager.id && node.x != null);
+        const reports = groupNodes.filter((node) => (
+          node.x != null
+          && (
+            node.managerId === manager.id
+            || (manager.id.startsWith('entity:') && node.entityId === manager.id && !node.managerId)
+          )
+        ));
         if (reports.length === 0) continue;
         const reportXs = reports.map((node) => node.x!);
         manager.x = (Math.min(...reportXs) + Math.max(...reportXs)) / 2;
@@ -348,7 +361,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
     const nodes: GNode[] = graph.nodes
       .filter((n) => !isHiddenFromGraph(n.id))
       .filter((n) => showOrphans || n.degree > 0)
-      .map((n) => ({ id: n.id, label: n.label, group: n.group, degree: n.degree, clients: n.clients, title: n.title, managerName: n.managerName, managerId: n.managerId, stance: n.stance, advisor: n.advisor }));
+      .map((n) => ({ id: n.id, label: n.label, group: n.group, degree: n.degree, clients: n.clients, title: n.title, managerName: n.managerName, managerId: n.managerId, entityId: n.entityId, stance: n.stance, advisor: n.advisor }));
 
     // "Filtre par client" (piloté par le menu de la sidebar) : ne conserve que
     // les nœuds rattachés aux clients sélectionnés — filtrage strict, sans halo de
@@ -533,7 +546,8 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
 
         ctx.globalAlpha = dim ? 0.18 : 1;
         ctx.beginPath();
-        ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+        if (n.id.startsWith('entity:')) ctx.rect(n.x - r, n.y - r, r * 2, r * 2);
+        else ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
         ctx.fillStyle = colors.get(n.group) ?? '#888';
         ctx.fill();
 
@@ -569,7 +583,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
         if (showLabel) {
           ctx.globalAlpha = dim ? 0.18 : 1;
           ctx.fillStyle = c.fg;
-          ctx.font = `${11 / k}px "Segoe UI", sans-serif`;
+          ctx.font = `${n.id.startsWith('entity:') ? '600 ' : ''}${11 / k}px "Segoe UI", sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'top';
           const label = n.label.length > 34 ? `${n.label.slice(0, 33)}…` : n.label;
