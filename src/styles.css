@@ -827,6 +827,38 @@ a:focus-visible,
   background: var(--surface-2);
 }
 
+.markdit-reader .wv-meddpicc-status-cell {
+  width: 4.5rem;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.wv-meddpicc-status {
+  display: inline-block;
+  width: 0.8rem;
+  height: 0.8rem;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--border);
+  vertical-align: middle;
+}
+
+.wv-meddpicc-status.is-red {
+  background: #d13438;
+}
+
+.wv-meddpicc-status.is-orange {
+  background: #e38b16;
+}
+
+.wv-meddpicc-status.is-green {
+  background: #2e9e4f;
+}
+
+.wv-meddpicc-status.is-unknown {
+  background: #8a8886;
+}
+
 .markdit-editor:focus-within {
   border-color: var(--accent);
 }

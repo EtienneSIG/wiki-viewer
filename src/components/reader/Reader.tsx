@@ -21,6 +21,57 @@ export interface ReaderProps {
   resolveAsset?: (path: string) => Promise<string | null>;
 }
 
+const MEDDPICC_STATUSES: Record<string, string> = {
+  rouge: 'red',
+  red: 'red',
+  orange: 'orange',
+  vert: 'green',
+  green: 'green',
+  inconnu: 'unknown',
+  unknown: 'unknown',
+};
+
+function decorateMeddpiccStatuses(root: HTMLElement): void {
+  const headings = Array.from(root.querySelectorAll<HTMLElement>('h1, h2, h3'))
+    .filter((heading) => heading.textContent?.trim().toLowerCase() === 'meddpicc');
+
+  for (const heading of headings) {
+    const headingLevel = Number(heading.tagName.slice(1));
+    let sibling = heading.nextElementSibling;
+    while (sibling) {
+      const siblingLevel = /^H[1-6]$/.test(sibling.tagName)
+        ? Number(sibling.tagName.slice(1))
+        : null;
+      if (siblingLevel !== null && siblingLevel <= headingLevel) break;
+      if (sibling instanceof HTMLTableElement) {
+        const headers = Array.from(sibling.querySelectorAll('thead th'));
+        const statusIndex = headers.findIndex((cell) => {
+          const label = cell.textContent?.trim().toLowerCase();
+          return label === 'statut' || label === 'status';
+        });
+        if (statusIndex >= 0) {
+          for (const row of sibling.querySelectorAll('tbody tr')) {
+            const cell = row.children.item(statusIndex);
+            const label = cell?.textContent?.trim() ?? '';
+            const status = MEDDPICC_STATUSES[label.toLowerCase()];
+            if (!(cell instanceof HTMLTableCellElement) || !status) continue;
+            const dot = document.createElement('span');
+            dot.className = `wv-meddpicc-status is-${status}`;
+            dot.setAttribute('role', 'img');
+            dot.setAttribute('aria-label', t('meddpicc.statusLabel', { status: label }));
+            dot.title = label;
+            cell.textContent = '';
+            cell.classList.add('wv-meddpicc-status-cell');
+            cell.append(dot);
+          }
+        }
+        break;
+      }
+      sibling = sibling.nextElementSibling;
+    }
+  }
+}
+
 /**
  * Read view (US1, FR-002): renders Markdown to sanitized HTML via the engine.
  * Syntax highlighting is applied progressively after paint so it never blocks
@@ -48,6 +99,11 @@ export function Reader({
     () => renderHtml(parse(markdown), { allowRemoteContent, highlight: !isLargeFile, wikiResolve }),
     [markdown, allowRemoteContent, isLargeFile, wikiResolve],
   );
+
+  useEffect(() => {
+    const root = containerRef.current;
+    if (root) decorateMeddpiccStatuses(root);
+  }, [html]);
 
   // Intercept clicks: wikilinks navigate inside the wiki; external links open
   // in a new tab so the single-page app is never navigated away.
