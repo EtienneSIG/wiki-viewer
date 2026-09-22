@@ -123,9 +123,10 @@ export function App(): JSX.Element {
     const tree = activeClientFilters.length > 0
       ? buildClientTree(model.files, activeClientFilters)
       : model.tree;
-    return tree.filter(
+    const preferredRoots = tree.filter(
       (node) => node.kind === 'dir' && SIDEBAR_ROOTS.has(node.name.toLowerCase()),
     );
+    return preferredRoots.length > 0 ? preferredRoots : tree;
   }, [model, activeClientFilters]);
 
   // Resolve a root-relative asset path (e.g. an image referenced from Markdown)

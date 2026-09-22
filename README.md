@@ -60,8 +60,14 @@ and marks **sponsors / detractors** and **trusted advisors**.
     gold *trusted-advisor* dot, read from the directory tables.
   - A **“links shown”** control (all / classic / influence) and node labels on
     by default.
-- **Client filter** — a dropdown at the bottom of the sidebar restricts the whole
-  app — file tree, page graph **and** contacts graph — to a single client (or all).
+- **Client filter** — a checkbox dropdown at the bottom of the sidebar restricts
+  the whole app — file tree, search, page graph **and** contacts graph — to one
+  or several clients. AXA and BNP are selected by default; “All clients” clears
+  the selection.
+- **Hierarchical contacts view** — organizes account contacts into tiered,
+  reorganizable pyramids with wrapped rows for dense levels.
+- **MEDDPICC status markers** — renders red, orange, green or gray status dots in
+  MEDDPICC review tables while keeping the Markdown source unchanged.
 - **`[[wikilinks]]`** — `[[target]]` and `[[target|alias]]` links become
   clickable in the reader; missing targets are flagged visually.
 - **Backlinks** — side panel listing the pages that point to the current page,
@@ -94,6 +100,41 @@ npm run dev
 Then open http://localhost:1421, click **Open a wiki** and select the `memory`
 folder (or any other folder of Markdown notes). Grant read/write access so you
 can save your changes.
+
+## Set up a compatible wiki
+
+Wiki Viewer reads a plain folder of Markdown — no database, no proprietary
+format. Everything (file tree, graph, backlinks, search, client filter, contacts
+graph) is inferred from file names, folders, a tiny YAML frontmatter and
+`[[wikilinks]]`. In short, a compatible repository:
+
+- has an entry page (`index.md`, or `README.md`);
+- uses Markdown files (`.md`, `.markdown`, `.mdown`, `.mkd`);
+- starts each page with a small frontmatter block (`title`, `category`, `tags`);
+- links pages with `[[Page Title]]` / `[[slug|alias]]`;
+- groups related pages with a shared `category` (or folder);
+- hides stubs/hubs by prefixing them with `_` (e.g. `_index.md`);
+- optionally adds `clients/` pages (client filter) and `contacts-<account>.md`
+  directory pages (contacts graph).
+
+### Using the setup skill
+
+A ready-made skill, [`skills/wikiviewer-setup/SKILL.md`](skills/wikiviewer-setup/SKILL.md),
+captures every convention so an AI agent can **scaffold a new wiki** or **convert
+an existing folder of notes** into a Wiki Viewer-compatible repository.
+
+- **With GitHub Copilot / an agent that supports skills:** point the agent at the
+  file and ask, e.g. *“Set up this folder as a Wiki Viewer wiki”* or *“Make my
+  notes compatible with Wiki Viewer”*. The agent loads
+  `skills/wikiviewer-setup/SKILL.md` and applies the frontmatter, `[[wikilinks]]`,
+  categories, hidden-page and client/contacts conventions for you.
+- **By hand:** open the skill and follow its numbered checklist (§1) and the
+  minimal scaffold (§10). It documents the exact frontmatter fields Wiki Viewer
+  reads, the tiny-YAML limits, the linking rules, and the optional client and
+  contacts-graph conventions.
+
+Once the folder follows those conventions, open it with **Open a wiki** and the
+tree, graph, backlinks and search populate automatically.
 
 ## Production build
 
