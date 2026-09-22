@@ -81,7 +81,7 @@ function radiusOf(node: GNode): number {
 function roleTier(node: GNode): number {
   if (node.id.startsWith('account:')) return 0;
   const text = `${node.label} ${node.title ?? ''}`.toLowerCase();
-  if (/(chief|cdo|cio|cto|ciso|cdio|executive|svp|vp|directeur|décideur|decideur)/.test(text)) return 1;
+  if (/(chief|ceo|cdo|cio|cto|ciso|cdio|executive|svp|vp|directeur|décideur|decideur)/.test(text)) return 1;
   if (/(head|director|directeur|manager|mgr|lead|responsable|owner|product)/.test(text)) return 2;
   if (/(architect|architecte|engineer|ingénieur|ingenieur|analyst|analyste|specialist|consultant)/.test(text)) return 3;
   return 4;
@@ -93,22 +93,24 @@ function hierarchyTier(node: GNode, nodeById: Map<string, GNode>, seen = new Set
   const manager = nodeById.get(node.managerId);
   if (!manager) return roleTier(node);
   const nextSeen = new Set(seen).add(node.id);
-  return Math.min(4, Math.max(roleTier(node), hierarchyTier(manager, nodeById, nextSeen) + 1));
+  return Math.max(roleTier(node), hierarchyTier(manager, nodeById, nextSeen) + 1);
 }
 
 function applyHierarchyLayout(nodes: GNode[], width: number, spacing = 1): void {
   const groups = [...new Set(nodes.map((n) => n.group))].sort((a, b) => a.localeCompare(b));
   const byGroup = new Map(groups.map((g) => [g, nodes.filter((n) => n.group === g)]));
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const tierById = new Map(nodes.map((node) => [node.id, hierarchyTier(node, nodeById)]));
   const nodeGap = 120 * spacing;
   const groupGap = 96 * spacing;
   const maxColumns = groups.length === 1 ? 6 : 4;
   const groupWidths = groups.map((group) => {
     const groupNodes = byGroup.get(group) ?? [];
+    const maxTier = Math.max(0, ...groupNodes.map((node) => tierById.get(node.id) ?? 0));
     const widestTier = Math.max(
       1,
-      ...Array.from({ length: 5 }, (_, tier) => (
-        groupNodes.filter((node) => hierarchyTier(node, nodeById) === tier).length
+      ...Array.from({ length: maxTier + 1 }, (_, tier) => (
+        groupNodes.filter((node) => tierById.get(node.id) === tier).length
       )),
     );
     const columns = Math.min(maxColumns, widestTier);
@@ -124,10 +126,11 @@ function applyHierarchyLayout(nodes: GNode[], width: number, spacing = 1): void 
     const groupNodes = byGroup.get(group) ?? [];
     const groupWidth = groupWidths[groupIndex];
     const centerX = groupLeft + groupWidth / 2;
+    const maxTier = Math.max(0, ...groupNodes.map((node) => tierById.get(node.id) ?? 0));
     let tierTop = 72;
-    for (let tier = 0; tier <= 4; tier++) {
+    for (let tier = 0; tier <= maxTier; tier++) {
       const tierNodes = groupNodes
-        .filter((node) => hierarchyTier(node, nodeById) === tier)
+        .filter((node) => tierById.get(node.id) === tier)
         .sort((a, b) => {
           const managerA = a.managerId ? nodeById.get(a.managerId)?.x ?? 0 : 0;
           const managerB = b.managerId ? nodeById.get(b.managerId)?.x ?? 0 : 0;
@@ -146,6 +149,16 @@ function applyHierarchyLayout(nodes: GNode[], width: number, spacing = 1): void 
         node.vy = 0;
       });
       tierTop += Math.max(1, Math.ceil(tierNodes.length / columns)) * rowGap;
+    }
+
+    for (let tier = maxTier - 1; tier >= 1; tier--) {
+      for (const manager of groupNodes.filter((node) => tierById.get(node.id) === tier)) {
+        const reports = groupNodes.filter((node) => node.managerId === manager.id && node.x != null);
+        if (reports.length === 0) continue;
+        const reportXs = reports.map((node) => node.x!);
+        manager.x = (Math.min(...reportXs) + Math.max(...reportXs)) / 2;
+        manager.fx = manager.x;
+      }
     }
     groupLeft += groupWidth + groupGap;
   });

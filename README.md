@@ -68,7 +68,8 @@ and marks **sponsors / detractors** and **trusted advisors**.
   the selection.
 - **Hierarchical contacts view** — organizes account contacts into tiered,
   reorganizable pyramids driven by the directory's potential N+1 field, with
-  role-based fallback and hover details when the N+1 is not provided.
+  each N+1 centered above their direct team, role-based fallback and hover
+  details when the N+1 is not provided.
 - **MEDDPICC status markers** — renders red, orange, green or gray status dots in
   MEDDPICC review tables while keeping the Markdown source unchanged.
 - **`[[wikilinks]]`** — `[[target]]` and `[[target|alias]]` links become
