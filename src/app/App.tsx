@@ -31,6 +31,7 @@ const BACKLINKS_DEFAULT_WIDTH = 240;
 
 const THEMES: ThemeId[] = ['system', 'light', 'dark', 'high-contrast'];
 const CURRENT_CLIENTS = ['axa', 'bnp'];
+const SIDEBAR_ROOTS = new Set(['assets', 'wiki']);
 
 function resolveTheme(theme: ThemeId): ThemeId {
   if (theme !== 'system') return theme;
@@ -116,7 +117,12 @@ export function App(): JSX.Element {
   // selection shows the full tree.
   const treeNodes = useMemo(() => {
     if (!model) return [];
-    return activeClientFilters.length > 0 ? buildClientTree(model.files, activeClientFilters) : model.tree;
+    const tree = activeClientFilters.length > 0
+      ? buildClientTree(model.files, activeClientFilters)
+      : model.tree;
+    return tree.filter(
+      (node) => node.kind === 'dir' && SIDEBAR_ROOTS.has(node.name.toLowerCase()),
+    );
   }, [model, activeClientFilters]);
 
   // Resolve a root-relative asset path (e.g. an image referenced from Markdown)
