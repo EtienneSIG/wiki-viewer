@@ -65,6 +65,10 @@ export interface GraphNode {
   clients: string[];
   /** Optional secondary line (e.g. a contact's job title) shown on hover/focus. */
   title?: string;
+  /** Contacts graph only: cleaned potential N+1 name from the directory table. */
+  managerName?: string;
+  /** Contacts graph only: resolved node id for the potential N+1. */
+  managerId?: string;
   /** Contacts graph only: sponsor / detractor stance for the contact. */
   stance?: 'sponsor' | 'detractor' | 'neutral';
   /** Contacts graph only: flagged as a trusted advisor. */
@@ -75,12 +79,13 @@ export interface GraphLink {
   source: string;
   target: string;
   /**
-   * `member` = structural spoke (contact → account hub); `influence` = an
+  * `member` = structural spoke (contact → account hub); `hierarchy` = a
+  * potential N+1 reporting link; `influence` = an
    * inferred influence/collaboration edge between two contacts; `cooccurrence` =
    * an empirical meeting/mail co-participation edge. Absent means a plain wiki
    * page link. Lets the graph render each edge kind distinctly.
    */
-  kind?: 'member' | 'influence' | 'cooccurrence';
+  kind?: 'member' | 'hierarchy' | 'influence' | 'cooccurrence';
 }
 
 export interface WikiGraph {

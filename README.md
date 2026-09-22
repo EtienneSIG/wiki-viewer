@@ -58,6 +58,8 @@ and marks **sponsors / detractors** and **trusted advisors**.
     drawn finely dotted/teal.
   - **Stance & advisor markers** — a green (sponsor) / red (detractor) ring and a
     gold *trusted-advisor* dot, read from the directory tables.
+  - **Link legend** — identifies account membership, potential N+1, influence
+    and co-occurrence lines with their actual color and stroke pattern.
   - A **“links shown”** control (all / classic / influence) and node labels on
     by default.
 - **Client filter** — a checkbox dropdown at the bottom of the sidebar restricts
@@ -65,7 +67,8 @@ and marks **sponsors / detractors** and **trusted advisors**.
   or several clients. AXA and BNP are selected by default; “All clients” clears
   the selection.
 - **Hierarchical contacts view** — organizes account contacts into tiered,
-  reorganizable pyramids with wrapped rows for dense levels.
+  reorganizable pyramids driven by the directory's potential N+1 field, with
+  role-based fallback and hover details when the N+1 is not provided.
 - **MEDDPICC status markers** — renders red, orange, green or gray status dots in
   MEDDPICC review tables while keeping the Markdown source unchanged.
 - **`[[wikilinks]]`** — `[[target]]` and `[[target|alias]]` links become

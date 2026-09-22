@@ -1719,6 +1719,28 @@ a:focus-visible,
   padding-top: 0.3rem;
   border-top: 1px solid var(--border);
 }
+.wv-graph-legend-links {
+  margin-top: 0.15rem;
+  padding-top: 0.3rem;
+  border-top: 1px solid var(--border);
+}
+.wv-graph-legend-line {
+  display: inline-block;
+  width: 1.35rem;
+  height: 0;
+  border-top: 1px solid var(--muted);
+  flex-shrink: 0;
+}
+.wv-graph-legend-line-hierarchy {
+  border-top-width: 2px;
+  border-top-color: var(--fg);
+}
+.wv-graph-legend-line-influence {
+  border-top: 2px dashed #d13438;
+}
+.wv-graph-legend-line-cooccurrence {
+  border-top: 2px dotted #168f8a;
+}
 .wv-graph-hint {
   position: absolute;
   bottom: 0.75rem;

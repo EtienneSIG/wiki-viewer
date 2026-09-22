@@ -90,7 +90,7 @@ function cleanCell(raw: string): string {
 /** Split a Markdown table row into trimmed cells (drops leading/trailing pipes). */
 function splitRow(line: string): string[] {
   const trimmed = line.trim().replace(/^\|/, '').replace(/\|$/, '');
-  return trimmed.split('|').map((c) => c.trim());
+  return trimmed.split(/(?<!\\)\|/).map((cell) => cell.replace(/\\\|/g, '|').trim());
 }
 
 /** A separator row is only dashes/colons/spaces between the pipes. */
@@ -116,6 +116,13 @@ function parseStance(raw: string): 'sponsor' | 'detractor' | 'neutral' | undefin
   if (s.includes('detract')) return 'detractor';
   if (s.includes('neutre') || s.includes('neutral')) return 'neutral';
   return undefined;
+}
+
+/** Keep only the potential manager's name; annotations remain in Markdown. */
+function parseManagerName(raw: string): string | undefined {
+  const cleaned = cleanCell(raw).replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!cleaned || /^(a|à) confirmer$/i.test(cleaned)) return undefined;
+  return cleaned;
 }
 
 /**
@@ -166,6 +173,8 @@ export function buildContactsGraph(model: WikiModel): ContactsGraphResult {
     contactCount = buildFromDirectoryPage(model, nodes, links, openTargets);
   }
 
+  addHierarchyLinks(nodes, links);
+
   // Enrich with contact-to-contact influence edges parsed from the influence
   // map page (best-effort; a no-op when the page is absent or not yet loaded).
   addInfluenceLinks(model, nodes, links);
@@ -192,7 +201,7 @@ function addContactRows(
   seqStart: number,
 ): number {
   let seq = seqStart;
-  let cols: { name: number; title: number; advisor: number; stance: number } | null = null;
+  let cols: { name: number; title: number; manager: number; advisor: number; stance: number } | null = null;
 
   for (const line of lines) {
     if (!line.trim().startsWith('|')) {
@@ -211,6 +220,7 @@ function addContactRows(
       cols = {
         name,
         title: norm.findIndex((c) => c === 'titre' || c === 'title'),
+        manager: norm.findIndex((c) => /(^|\s)n\s*\+\s*1(\s|$)/.test(c) || c.includes('manager')),
         advisor: norm.findIndex((c) => c.includes('trusted advisor') || c.includes('advisor')),
         stance: norm.findIndex((c) => c.includes('sponsor') || c.includes('detract')),
       };
@@ -220,6 +230,7 @@ function addContactRows(
     const name = cleanCell(cells[cols.name] ?? '');
     if (!name) continue;
     const title = cols.title >= 0 ? cleanCell(cells[cols.title] ?? '') : '';
+    const managerName = cols.manager >= 0 ? parseManagerName(cells[cols.manager] ?? '') : undefined;
     const advisor = cols.advisor >= 0 ? cleanCell(cells[cols.advisor] ?? '') !== '' : false;
     const stance = cols.stance >= 0 ? parseStance(cells[cols.stance] ?? '') : undefined;
 
@@ -231,6 +242,7 @@ function addContactRows(
       degree: 1,
       clients: [account.slug],
       title: title || undefined,
+      managerName,
       stance,
       advisor: advisor || undefined,
     });
@@ -239,6 +251,22 @@ function addContactRows(
   }
 
   return seq;
+}
+
+/** Resolve potential N+1 names within each account and add reporting links. */
+function addHierarchyLinks(nodes: GraphNode[], links: GraphLink[]): void {
+  const index = indexContacts(nodes);
+  for (const node of nodes) {
+    if (!node.id.startsWith('contact:') || !node.managerName) continue;
+    const slug = node.clients[0];
+    if (!slug) continue;
+    const managerId = resolveContact(node.managerName, [slug], index);
+    if (!managerId || managerId === node.id) continue;
+    node.managerId = managerId;
+    links.push({ source: node.id, target: managerId, kind: 'hierarchy' });
+    const manager = nodes.find((candidate) => candidate.id === managerId);
+    if (manager) manager.degree += 1;
+  }
 }
 
 /**

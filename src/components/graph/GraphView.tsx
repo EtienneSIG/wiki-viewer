@@ -34,10 +34,12 @@ interface GNode extends SimulationNodeDatum {
   degree: number;
   clients: string[];
   title?: string;
+  managerName?: string;
+  managerId?: string;
   stance?: 'sponsor' | 'detractor' | 'neutral';
   advisor?: boolean;
 }
-type GLink = SimulationLinkDatum<GNode> & { kind?: 'member' | 'influence' | 'cooccurrence' };
+type GLink = SimulationLinkDatum<GNode> & { kind?: 'member' | 'hierarchy' | 'influence' | 'cooccurrence' };
 
 interface Transform {
   x: number;
@@ -76,7 +78,7 @@ function radiusOf(node: GNode): number {
   return Math.min(22, 4 + Math.sqrt(node.degree) * 2.2);
 }
 
-function hierarchyTier(node: GNode): number {
+function roleTier(node: GNode): number {
   if (node.id.startsWith('account:')) return 0;
   const text = `${node.label} ${node.title ?? ''}`.toLowerCase();
   if (/(chief|cdo|cio|cto|ciso|cdio|executive|svp|vp|directeur|décideur|decideur)/.test(text)) return 1;
@@ -85,9 +87,19 @@ function hierarchyTier(node: GNode): number {
   return 4;
 }
 
+function hierarchyTier(node: GNode, nodeById: Map<string, GNode>, seen = new Set<string>()): number {
+  if (node.id.startsWith('account:')) return 0;
+  if (!node.managerId || seen.has(node.id)) return roleTier(node);
+  const manager = nodeById.get(node.managerId);
+  if (!manager) return roleTier(node);
+  const nextSeen = new Set(seen).add(node.id);
+  return Math.min(4, Math.max(roleTier(node), hierarchyTier(manager, nodeById, nextSeen) + 1));
+}
+
 function applyHierarchyLayout(nodes: GNode[], width: number, spacing = 1): void {
   const groups = [...new Set(nodes.map((n) => n.group))].sort((a, b) => a.localeCompare(b));
   const byGroup = new Map(groups.map((g) => [g, nodes.filter((n) => n.group === g)]));
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const nodeGap = 120 * spacing;
   const groupGap = 96 * spacing;
   const maxColumns = groups.length === 1 ? 6 : 4;
@@ -96,7 +108,7 @@ function applyHierarchyLayout(nodes: GNode[], width: number, spacing = 1): void 
     const widestTier = Math.max(
       1,
       ...Array.from({ length: 5 }, (_, tier) => (
-        groupNodes.filter((node) => hierarchyTier(node) === tier).length
+        groupNodes.filter((node) => hierarchyTier(node, nodeById) === tier).length
       )),
     );
     const columns = Math.min(maxColumns, widestTier);
@@ -114,7 +126,13 @@ function applyHierarchyLayout(nodes: GNode[], width: number, spacing = 1): void 
     const centerX = groupLeft + groupWidth / 2;
     let tierTop = 72;
     for (let tier = 0; tier <= 4; tier++) {
-      const tierNodes = groupNodes.filter((n) => hierarchyTier(n) === tier);
+      const tierNodes = groupNodes
+        .filter((node) => hierarchyTier(node, nodeById) === tier)
+        .sort((a, b) => {
+          const managerA = a.managerId ? nodeById.get(a.managerId)?.x ?? 0 : 0;
+          const managerB = b.managerId ? nodeById.get(b.managerId)?.x ?? 0 : 0;
+          return managerA - managerB || a.label.localeCompare(b.label);
+        });
       const columns = Math.min(maxColumns, Math.max(1, tierNodes.length));
       tierNodes.forEach((node, i) => {
         const row = Math.floor(i / columns);
@@ -234,6 +252,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
   // Whether this graph carries empirical co-occurrence edges — gates the opt-in
   // co-occurrence toggle.
   const hasCooccurrence = graph.links.some((l) => l.kind === 'cooccurrence');
+  const hasHierarchy = graph.links.some((l) => l.kind === 'hierarchy');
   // Whether any node carries a sponsor/detractor stance or advisor flag —
   // gates the stance legend.
   const hasStance = graph.nodes.some(
@@ -294,7 +313,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
     const nodes: GNode[] = graph.nodes
       .filter((n) => !isHiddenFromGraph(n.id))
       .filter((n) => showOrphans || n.degree > 0)
-      .map((n) => ({ id: n.id, label: n.label, group: n.group, degree: n.degree, clients: n.clients, title: n.title, stance: n.stance, advisor: n.advisor }));
+      .map((n) => ({ id: n.id, label: n.label, group: n.group, degree: n.degree, clients: n.clients, title: n.title, managerName: n.managerName, managerId: n.managerId, stance: n.stance, advisor: n.advisor }));
 
     // "Filtre par client" (piloté par le menu de la sidebar) : ne conserve que
     // les nœuds rattachés aux clients sélectionnés — filtrage strict, sans halo de
@@ -307,9 +326,16 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
     }
 
     const present = new Set(nodes.map((n) => n.id));
+    const filteredNodeById = new Map(nodes.map((node) => [node.id, node]));
     const links: GLink[] = graph.links
       .filter((l) => present.has(l.source) && present.has(l.target))
       .filter((l) => {
+        if (l.kind === 'hierarchy') return hierarchyView;
+        if (
+          hierarchyView
+          && l.kind === 'member'
+          && filteredNodeById.get(l.source)?.managerId
+        ) return false;
         // Co-occurrence is an independent opt-in overlay; every other kind is
         // governed by the "links shown" mode.
         if (l.kind === 'cooccurrence') return showCooccurrence;
@@ -439,6 +465,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
           focusId != null && (s.id === focusId || t.id === focusId);
         const influence = l.kind === 'influence';
         const cooccurrence = l.kind === 'cooccurrence';
+        const hierarchy = l.kind === 'hierarchy';
         if (influence) {
           // Influence edges: accented + dashed so they stand out from spokes.
           ctx.lineWidth = (touchesFocus ? 2 : 1.4) / k;
@@ -450,8 +477,8 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
           ctx.strokeStyle = touchesFocus ? c.cooccurrenceStrong : c.cooccurrence;
           ctx.setLineDash([1.5 / k, 3 / k]);
         } else {
-          ctx.lineWidth = 1 / k;
-          ctx.strokeStyle = touchesFocus ? c.linkStrong : c.link;
+          ctx.lineWidth = (hierarchy ? 1.8 : 1) / k;
+          ctx.strokeStyle = hierarchy || touchesFocus ? c.linkStrong : c.link;
           ctx.setLineDash([]);
         }
         ctx.beginPath();
@@ -547,6 +574,14 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
         if (n.x == null || n.y == null) continue;
         const r = radiusOf(n) + 3;
         if ((n.x - p.x) ** 2 + (n.y - p.y) ** 2 <= r * r) return n;
+        if (labelsRef.current) {
+          const halfLabelWidth = Math.min(34, n.label.length) * 3.2;
+          if (
+            Math.abs(n.x - p.x) <= halfLabelWidth
+            && p.y >= n.y + r
+            && p.y <= n.y + r + 16
+          ) return n;
+        }
       }
       return null;
     };
@@ -581,6 +616,11 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
         if (id !== hoverRef.current) {
           hoverRef.current = id;
           canvas.style.cursor = id ? 'pointer' : 'grab';
+          canvas.title = hit?.id.startsWith('contact:')
+            ? hit.managerName
+              ? t('graph.managerTooltip', { manager: hit.managerName })
+              : t('graph.managerMissing')
+            : '';
           drawRef.current();
         }
         return;
@@ -640,6 +680,7 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
       if (mode !== 'none') return;
       if (hoverRef.current !== null) {
         hoverRef.current = null;
+        canvas.title = '';
         drawRef.current();
       }
       canvas.style.cursor = 'grab';
@@ -814,6 +855,30 @@ export function GraphView({ graph, activePath, onOpen, theme, searchPlaceholder,
             </span>
           </div>
         )}
+        <div className="wv-graph-legend wv-graph-legend-links" aria-label={t('graph.linkLegend')}>
+          <span className="wv-graph-legend-item" title={t('graph.linkStructure')}>
+            <span className="wv-graph-legend-line wv-graph-legend-line-structure" />
+            {t('graph.linkStructure')}
+          </span>
+          {hasHierarchy && (
+            <span className="wv-graph-legend-item" title={t('graph.linkHierarchy')}>
+              <span className="wv-graph-legend-line wv-graph-legend-line-hierarchy" />
+              {t('graph.linkHierarchy')}
+            </span>
+          )}
+          {hasInfluence && (
+            <span className="wv-graph-legend-item" title={t('graph.linkInfluence')}>
+              <span className="wv-graph-legend-line wv-graph-legend-line-influence" />
+              {t('graph.linkInfluence')}
+            </span>
+          )}
+          {hasCooccurrence && (
+            <span className="wv-graph-legend-item" title={t('graph.linkCooccurrence')}>
+              <span className="wv-graph-legend-line wv-graph-legend-line-cooccurrence" />
+              {t('graph.linkCooccurrence')}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="wv-graph-hint" aria-hidden="true">
